@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: youtube-watch-party
+    env: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: 8080
+      - key: APP_NAME
+        value: YouTube Watch Party
+      - key: SUPPORT_EMAIL
+        sync: false
+      - key: BUSINESS_NAME
+        sync: false
+      - key: STRIPE_PAYMENT_LINK
+        sync: false
+      - key: YOUTUBE_API_KEY
+        sync: false

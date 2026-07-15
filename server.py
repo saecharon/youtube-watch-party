@@ -1,0 +1,1100 @@
+from __future__ import annotations
+
+import html
+import json
+import mimetypes
+import os
+import re
+import secrets
+import ssl
+import threading
+import time
+import urllib.error
+import urllib.request
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import parse_qs, quote_plus, urlparse
+
+
+ROOT = Path(__file__).resolve().parent
+PUBLIC = ROOT / "public"
+DATA_DIR = ROOT / "data"
+ROOMS_FILE = DATA_DIR / "rooms.json"
+ACCOUNTS_FILE = DATA_DIR / "accounts.json"
+MAX_USERS = 5
+ROOM_TTL_SECONDS = 60 * 60 * 8
+YOUTUBE_SEARCH_TIMEOUT = 6
+DEFAULT_VIDEO = "M7lc1UVf-VE"
+APP_NAME = os.environ.get("APP_NAME", "YouTube Watch Party")
+SUPPORT_EMAIL = os.environ.get("SUPPORT_EMAIL", "support@example.com")
+BUSINESS_NAME = os.environ.get("BUSINESS_NAME", APP_NAME)
+STRIPE_PAYMENT_LINK = os.environ.get("STRIPE_PAYMENT_LINK", "")
+YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY", "")
+LUDO_SAFE_TILES = {0, 8, 14, 22, 28, 36, 42, 50}
+LUDO_START_OFFSETS = [0, 14, 28, 42]
+
+THEMES = {
+    "late-night": {"name": "Late Night", "emoji": "🌙"},
+    "study-lofi": {"name": "Study Lofi", "emoji": "📚"},
+    "party": {"name": "Party", "emoji": "🔥"},
+    "movie": {"name": "Movie Night", "emoji": "🍿"},
+    "heartbreak": {"name": "Heartbreak", "emoji": "💔"},
+    "anime": {"name": "Anime", "emoji": "✨"},
+}
+
+DEFAULT_MIX = {"bass": 40, "volume": 85}
+
+PROMPTS = [
+    "Rate this video out of 10.",
+    "Guess the next lyric.",
+    "Would you replay this or skip?",
+    "Drop one word for the vibe.",
+    "Who should be DJ next?",
+    "Best moment so far?",
+]
+
+rooms: dict[str, dict] = {}
+accounts: dict[str, dict] = {}
+lock = threading.Lock()
+
+
+def now_ms() -> int:
+    return int(time.time() * 1000)
+
+
+def clean_room_id(value: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9-]", "", value.strip())[:32]
+
+
+def clean_video_id(value: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9_-]", "", value.strip())[:32]
+
+
+def clean_email(value: str) -> str:
+    return value.strip().lower()[:120]
+
+
+def new_room_id() -> str:
+    return secrets.token_urlsafe(5).replace("_", "-")
+
+
+def make_event(room: dict, event_type: str, payload: dict) -> dict:
+    room["seq"] += 1
+    event = {"seq": room["seq"], "type": event_type, "payload": payload, "at": now_ms()}
+    room["events"].append(event)
+    room["events"] = room["events"][-160:]
+    save_rooms()
+    return event
+
+
+def load_rooms() -> None:
+    global rooms
+    if not ROOMS_FILE.exists():
+        return
+    try:
+        data = json.loads(ROOMS_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    if isinstance(data, dict):
+        rooms = data
+
+
+def load_accounts() -> None:
+    global accounts
+    if not ACCOUNTS_FILE.exists():
+        return
+    try:
+        data = json.loads(ACCOUNTS_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    if isinstance(data, dict):
+        accounts = data
+
+
+def save_rooms() -> None:
+    try:
+        DATA_DIR.mkdir(exist_ok=True)
+        temp_file = ROOMS_FILE.with_suffix(".json.tmp")
+        temp_file.write_text(json.dumps(rooms), encoding="utf-8")
+        temp_file.replace(ROOMS_FILE)
+    except OSError:
+        pass
+
+
+def save_accounts() -> None:
+    try:
+        DATA_DIR.mkdir(exist_ok=True)
+        temp_file = ACCOUNTS_FILE.with_suffix(".json.tmp")
+        temp_file.write_text(json.dumps(accounts), encoding="utf-8")
+        temp_file.replace(ACCOUNTS_FILE)
+    except OSError:
+        pass
+
+
+def award_badges(user: dict, badge: str) -> None:
+    badges = user.setdefault("badges", [])
+    if badge not in badges:
+        badges.append(badge)
+
+
+def active_users(room: dict) -> list[dict]:
+    cutoff = now_ms() - 15000
+    users = []
+    for user in room["users"].values():
+        copy = {
+            "id": user.get("id", ""),
+            "name": user.get("name", "Guest"),
+            "avatar": user.get("avatar", "🎧"),
+            "vibe": user.get("vibe", "Ready"),
+            "joinedAt": user.get("joinedAt", 0),
+            "lastSeen": user.get("lastSeen", 0),
+            "badges": user.get("badges", []),
+            "stats": user.get("stats", {}),
+        }
+        copy["online"] = user.get("lastSeen", 0) >= cutoff
+        users.append(copy)
+    return users
+
+
+def queue_snapshot(room: dict) -> list[dict]:
+    items = []
+    for item in room["queue"]:
+        copy = dict(item)
+        copy["votes"] = len(item.get("votes", []))
+        copy["voterIds"] = list(item.get("votes", []))
+        items.append(copy)
+    return sorted(items, key=lambda item: (-item["votes"], item["addedAt"]))
+
+
+def room_game_players(room: dict) -> list[dict]:
+    users = list(room["users"].values())[:4]
+    if not users:
+        users = [{"id": "", "name": "Player 1", "avatar": "🎧"}]
+    return users
+
+
+def initial_ludo_pawns(count: int) -> list[list[int]]:
+    return [[-1, -1, -1, -1] for _ in range(count)]
+
+
+def default_games(count: int = 1) -> dict:
+    return {
+        "ludo": {
+            "turn": 0,
+            "pawns": initial_ludo_pawns(count),
+            "winner": None,
+            "lastRoll": None,
+            "message": "New Ludo round. Roll a 6 to open one pawn.",
+            "updatedAt": now_ms(),
+        },
+        "snakes": {
+            "turn": 0,
+            "positions": [1 for _ in range(count)],
+            "winner": None,
+            "lastRoll": None,
+            "message": "New Snake & Ladder round. First exact 100 wins.",
+            "updatedAt": now_ms(),
+        },
+    }
+
+
+def normalize_ludo_pawns(pawns: object, count: int) -> list[list[int]]:
+    source = pawns if isinstance(pawns, list) else []
+    next_pawns = [item for item in source[:count]]
+    while len(next_pawns) < count:
+        next_pawns.append([-1, -1, -1, -1])
+    normalized = []
+    for player_pawns in next_pawns:
+        if not isinstance(player_pawns, list):
+            normalized.append([-1, -1, -1, -1])
+            continue
+        row = [int(value) if isinstance(value, (int, float)) else -1 for value in player_pawns[:4]]
+        while len(row) < 4:
+            row.append(-1)
+        normalized.append(row)
+    return normalized
+
+
+def normalize_slots(slots: object, count: int, fallback: int) -> list[int]:
+    source = slots if isinstance(slots, list) else []
+    next_slots = [int(value) if isinstance(value, (int, float)) else fallback for value in source[:count]]
+    while len(next_slots) < count:
+        next_slots.append(fallback)
+    return next_slots
+
+
+def normalize_games(room: dict) -> dict:
+    count = max(1, len(room_game_players(room)))
+    games = room.setdefault("games", default_games(count))
+    ludo = games.setdefault("ludo", default_games(count)["ludo"])
+    snakes = games.setdefault("snakes", default_games(count)["snakes"])
+    ludo["pawns"] = normalize_ludo_pawns(ludo.get("pawns"), count)
+    snakes["positions"] = normalize_slots(snakes.get("positions"), count, 1)
+    ludo["turn"] = int(ludo.get("turn", 0) or 0) % count
+    snakes["turn"] = int(snakes.get("turn", 0) or 0) % count
+    ludo.setdefault("winner", None)
+    ludo.setdefault("lastRoll", None)
+    ludo.setdefault("message", "New Ludo round. Roll a 6 to open one pawn.")
+    snakes.setdefault("winner", None)
+    snakes.setdefault("lastRoll", None)
+    snakes.setdefault("message", "New Snake & Ladder round. First exact 100 wins.")
+    return games
+
+
+def games_snapshot(room: dict) -> dict:
+    games = normalize_games(room)
+    return {
+        "ludo": {
+            "turn": games["ludo"]["turn"],
+            "pawns": [row[:] for row in games["ludo"]["pawns"]],
+            "winner": games["ludo"].get("winner"),
+            "lastRoll": games["ludo"].get("lastRoll"),
+            "message": games["ludo"].get("message", ""),
+            "updatedAt": games["ludo"].get("updatedAt", now_ms()),
+        },
+        "snakes": {
+            "turn": games["snakes"]["turn"],
+            "positions": games["snakes"]["positions"][:],
+            "winner": games["snakes"].get("winner"),
+            "lastRoll": games["snakes"].get("lastRoll"),
+            "message": games["snakes"].get("message", ""),
+            "updatedAt": games["snakes"].get("updatedAt", now_ms()),
+        },
+    }
+
+
+def room_snapshot(room_id: str, room: dict) -> dict:
+    room.setdefault("mix", DEFAULT_MIX.copy())
+    return {
+        "roomId": room_id,
+        "users": active_users(room),
+        "videoId": room["state"]["videoId"],
+        "status": room["state"]["status"],
+        "position": room["state"]["position"],
+        "updatedAt": room["state"]["updatedAt"],
+        "seq": room["seq"],
+        "hostId": room.get("hostId"),
+        "theme": room.get("theme", "party"),
+        "mix": room.get("mix", DEFAULT_MIX.copy()),
+        "queue": queue_snapshot(room),
+        "history": room.get("history", [])[-8:],
+        "typing": [
+            {"userId": user_id, "name": name}
+            for user_id, data in room.get("typing", {}).items()
+            if data.get("until", 0) > now_ms()
+            for name in [data.get("name", "Someone")]
+        ],
+        "prompt": room.get("prompt"),
+        "games": games_snapshot(room),
+    }
+
+
+def get_or_create_room(room_id: str | None = None) -> tuple[str, dict]:
+    chosen = clean_room_id(room_id or "") or new_room_id()
+    if chosen not in rooms:
+        rooms[chosen] = {
+            "users": {},
+            "events": [],
+            "queue": [],
+            "history": [],
+            "typing": {},
+            "seq": 0,
+            "hostId": None,
+            "theme": "party",
+            "mix": DEFAULT_MIX.copy(),
+            "prompt": {"text": PROMPTS[0], "at": now_ms()},
+            "games": default_games(1),
+            "createdAt": now_ms(),
+            "lastSeen": now_ms(),
+            "state": {"videoId": DEFAULT_VIDEO, "status": "paused", "position": 0, "updatedAt": now_ms()},
+        }
+    rooms[chosen]["lastSeen"] = now_ms()
+    return chosen, rooms[chosen]
+
+
+def public_rooms() -> list[dict]:
+    rows = []
+    for room_id, room in rooms.items():
+        users = active_users(room)
+        if not users:
+            continue
+        theme = THEMES.get(room.get("theme", "party"), THEMES["party"])
+        rows.append(
+            {
+                "roomId": room_id,
+                "people": len(users),
+                "theme": room.get("theme", "party"),
+                "themeName": theme["name"],
+                "themeEmoji": theme["emoji"],
+                "status": room["state"]["status"],
+            }
+        )
+    return sorted(rows, key=lambda row: (-row["people"], row["roomId"]))[:12]
+
+
+def prune_rooms() -> None:
+    cutoff = now_ms() - (ROOM_TTL_SECONDS * 1000)
+    empty_for = now_ms() - (5 * 60 * 1000)
+    changed = False
+    for room_id in list(rooms.keys()):
+        room = rooms[room_id]
+        stale = room["lastSeen"] < cutoff
+        empty = not room["users"] and room["lastSeen"] < empty_for
+        if stale or empty:
+            del rooms[room_id]
+            changed = True
+    if changed:
+        save_rooms()
+
+
+def read_json(handler: BaseHTTPRequestHandler) -> dict:
+    length = int(handler.headers.get("Content-Length", "0"))
+    if length == 0:
+        return {}
+    return json.loads(handler.rfile.read(length).decode("utf-8"))
+
+
+def decode_js_string(value: str) -> str:
+    try:
+        return json.loads(f'"{value}"')
+    except json.JSONDecodeError:
+        return html.unescape(value)
+
+
+def search_youtube(query: str) -> list[dict]:
+    if not query:
+        return []
+    if YOUTUBE_API_KEY:
+        api_url = (
+            "https://www.googleapis.com/youtube/v3/search"
+            f"?part=snippet&type=video&videoEmbeddable=true&maxResults=8&q={quote_plus(query)}&key={quote_plus(YOUTUBE_API_KEY)}"
+        )
+        with urllib.request.urlopen(api_url, timeout=YOUTUBE_SEARCH_TIMEOUT) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        results = []
+        for item in payload.get("items", []):
+            video_id = item.get("id", {}).get("videoId", "")
+            snippet = item.get("snippet", {})
+            title = html.unescape(snippet.get("title", "YouTube video"))
+            thumbnail = snippet.get("thumbnails", {}).get("high", {}).get("url") or f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
+            if video_id:
+                results.append({"videoId": video_id, "title": title[:140], "thumbnail": thumbnail, "url": f"https://www.youtube.com/watch?v={video_id}"})
+        return results
+
+    search_url = f"https://www.youtube.com/results?search_query={quote_plus(query)}"
+    request = urllib.request.Request(
+        search_url,
+        headers={"User-Agent": "Mozilla/5.0 WatchParty/1.0", "Accept-Language": "en-US,en;q=0.9"},
+    )
+    context = ssl._create_unverified_context()
+    with urllib.request.urlopen(request, timeout=YOUTUBE_SEARCH_TIMEOUT, context=context) as response:
+        page = response.read().decode("utf-8", errors="ignore")
+
+    results = []
+    seen = set()
+    for match in re.finditer(r'"videoId":"([a-zA-Z0-9_-]{11})"', page):
+        video_id = match.group(1)
+        if video_id in seen:
+            continue
+        nearby = page[match.start() : match.start() + 2400]
+        title_match = re.search(r'"title":\{"runs":\[\{"text":"(.*?)"\}\]', nearby)
+        if not title_match:
+            title_match = re.search(r'"title":\{"simpleText":"(.*?)"\}', nearby)
+        if not title_match:
+            continue
+        title = decode_js_string(title_match.group(1)).strip()
+        if not title or title.lower() == "youtube":
+            continue
+        seen.add(video_id)
+        results.append(
+            {
+                "videoId": video_id,
+                "title": title[:140],
+                "thumbnail": f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg",
+                "url": f"https://www.youtube.com/watch?v={video_id}",
+            }
+        )
+        if len(results) >= 8:
+            break
+    return results
+
+
+def ludo_board_index(player_index: int, progress: int) -> int:
+    return (progress + LUDO_START_OFFSETS[player_index]) % 56
+
+
+def ludo_landing_captures(pawns: list[list[int]], player_index: int, landing_progress: int) -> int:
+    if landing_progress < 0 or landing_progress >= 52:
+        return 0
+    landing = ludo_board_index(player_index, landing_progress)
+    if landing in LUDO_SAFE_TILES:
+        return 0
+    total = 0
+    for rival_index, rival_pawns in enumerate(pawns):
+        if rival_index == player_index:
+            continue
+        total += sum(1 for position in rival_pawns if 0 <= position < 52 and ludo_board_index(rival_index, position) == landing)
+    return total
+
+
+def ludo_move_candidates(pawns: list[list[int]], player_index: int, roll: int) -> list[dict]:
+    candidates = []
+    for pawn_index, position in enumerate(pawns[player_index]):
+        if position == 57:
+            continue
+        if position < 0:
+            if roll == 6:
+                candidates.append(
+                    {
+                        "pawnIndex": pawn_index,
+                        "from": position,
+                        "to": 0,
+                        "opens": True,
+                        "finishes": False,
+                        "captures": ludo_landing_captures(pawns, player_index, 0),
+                    }
+                )
+            continue
+        to = position + roll
+        if to <= 57:
+            candidates.append(
+                {
+                    "pawnIndex": pawn_index,
+                    "from": position,
+                    "to": to,
+                    "opens": False,
+                    "finishes": to == 57,
+                    "captures": ludo_landing_captures(pawns, player_index, to),
+                }
+            )
+    return candidates
+
+
+def choose_ludo_move(candidates: list[dict]) -> dict:
+    return sorted(
+        candidates,
+        key=lambda move: (
+            0 if move["finishes"] else 1,
+            -move["captures"],
+            1 if move["opens"] else 0,
+            -move["to"],
+        ),
+    )[0]
+
+
+def capture_ludo_rival(pawns: list[list[int]], players: list[dict], player_index: int, pawn_index: int) -> str:
+    progress = pawns[player_index][pawn_index]
+    if progress < 0 or progress >= 52:
+        return ""
+    landing = ludo_board_index(player_index, progress)
+    if landing in LUDO_SAFE_TILES:
+        return ""
+    for rival_index, rival_pawns in enumerate(pawns):
+        if rival_index == player_index:
+            continue
+        for rival_pawn_index, position in enumerate(rival_pawns):
+            if position < 0 or position >= 52:
+                continue
+            if ludo_board_index(rival_index, position) == landing:
+                pawns[rival_index][rival_pawn_index] = -1
+                return players[rival_index].get("name", f"Player {rival_index + 1}")
+    return ""
+
+
+def snake_jumps() -> dict[int, dict]:
+    return {
+        4: {"to": 25, "type": "ladder"},
+        9: {"to": 31, "type": "ladder"},
+        20: {"to": 38, "type": "ladder"},
+        28: {"to": 84, "type": "ladder"},
+        40: {"to": 59, "type": "ladder"},
+        51: {"to": 67, "type": "ladder"},
+        63: {"to": 81, "type": "ladder"},
+        71: {"to": 91, "type": "ladder"},
+        17: {"to": 7, "type": "snake"},
+        54: {"to": 34, "type": "snake"},
+        62: {"to": 19, "type": "snake"},
+        64: {"to": 60, "type": "snake"},
+        87: {"to": 24, "type": "snake"},
+        93: {"to": 73, "type": "snake"},
+        95: {"to": 75, "type": "snake"},
+        98: {"to": 79, "type": "snake"},
+    }
+
+
+def roll_dice() -> int:
+    return secrets.randbelow(6) + 1
+
+
+def valid_session(user: dict, session_token: str) -> bool:
+    stored = str(user.get("sessionToken", ""))
+    provided = str(session_token)
+    return bool(stored and provided and secrets.compare_digest(stored, provided))
+
+
+class WatchPartyHandler(BaseHTTPRequestHandler):
+    server_version = "WatchParty/2.0"
+
+    def do_HEAD(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path.startswith("/api/"):
+            self.send_error(HTTPStatus.METHOD_NOT_ALLOWED)
+            return
+        self.serve_static(parsed.path, include_body=False)
+
+    def do_GET(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path.startswith("/api/"):
+            self.route_get(parsed.path, parse_qs(parsed.query))
+            return
+        self.serve_static(parsed.path)
+
+    def do_POST(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path.startswith("/api/"):
+            self.route_post(parsed.path)
+            return
+        self.send_error(HTTPStatus.NOT_FOUND)
+
+    def route_get(self, path: str, query: dict[str, list[str]]) -> None:
+        if path == "/api/health":
+            with lock:
+                self.json_response({"ok": True, "rooms": len(rooms), "accounts": len(accounts), "time": now_ms()})
+            return
+
+        if path == "/api/config":
+            self.json_response(
+                {
+                    "appName": APP_NAME,
+                    "supportEmail": SUPPORT_EMAIL,
+                    "businessName": BUSINESS_NAME,
+                    "paymentsEnabled": bool(STRIPE_PAYMENT_LINK),
+                    "paymentLink": STRIPE_PAYMENT_LINK,
+                    "officialYoutubeSearch": bool(YOUTUBE_API_KEY),
+                }
+            )
+            return
+
+        if path == "/api/rooms":
+            with lock:
+                prune_rooms()
+                self.json_response({"rooms": public_rooms(), "themes": THEMES})
+            return
+
+        if path == "/api/search":
+            search_text = str(query.get("q", [""])[0]).strip()[:120]
+            if len(search_text) < 2:
+                self.json_response({"results": []})
+                return
+            try:
+                self.json_response({"results": search_youtube(search_text)})
+            except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                self.json_response(
+                    {
+                        "error": "YouTube search is unavailable from this server right now.",
+                        "details": str(exc)[:160],
+                        "searchUrl": f"https://www.youtube.com/results?search_query={quote_plus(search_text)}",
+                    },
+                    HTTPStatus.BAD_GATEWAY,
+                )
+            return
+
+        if path == "/api/events":
+            room_id = clean_room_id(query.get("room", [""])[0])
+            user_id = query.get("user", [""])[0]
+            session_token = query.get("token", [""])[0]
+            since = int(query.get("since", ["0"])[0] or 0)
+            with lock:
+                prune_rooms()
+                room = rooms.get(room_id)
+                if not room or user_id not in room["users"]:
+                    self.json_response({"error": "Room or user not found"}, HTTPStatus.NOT_FOUND)
+                    return
+                if not valid_session(room["users"][user_id], session_token):
+                    self.json_response({"error": "Login expired. Please join the room again."}, HTTPStatus.UNAUTHORIZED)
+                    return
+                room["lastSeen"] = now_ms()
+                room["users"][user_id]["lastSeen"] = now_ms()
+                events = [event for event in room["events"] if event["seq"] > since]
+                snapshot = room_snapshot(room_id, room)
+            self.json_response({"events": events, "snapshot": snapshot})
+            return
+        self.send_error(HTTPStatus.NOT_FOUND)
+
+    def route_post(self, path: str) -> None:
+        try:
+            data = read_json(self)
+        except Exception:
+            self.json_response({"error": "Invalid JSON"}, HTTPStatus.BAD_REQUEST)
+            return
+
+        if path == "/api/join":
+            self.handle_join(data)
+            return
+        if path == "/api/leave":
+            self.handle_leave(data)
+            return
+
+        room_id, user_id = self.require_member(data)
+        if not room_id:
+            return
+
+        if path == "/api/chat":
+            self.handle_chat(room_id, user_id, data)
+            return
+        if path == "/api/control":
+            self.handle_control(room_id, user_id, data)
+            return
+        if path == "/api/theme":
+            self.handle_theme(room_id, user_id, data)
+            return
+        if path == "/api/mix":
+            self.handle_mix(room_id, user_id, data)
+            return
+        if path == "/api/queue/add":
+            self.handle_queue_add(room_id, user_id, data)
+            return
+        if path == "/api/queue/vote":
+            self.handle_queue_vote(room_id, user_id, data)
+            return
+        if path == "/api/queue/play":
+            self.handle_queue_play(room_id, user_id, data)
+            return
+        if path == "/api/reaction":
+            self.handle_reaction(room_id, user_id, data)
+            return
+        if path == "/api/typing":
+            self.handle_typing(room_id, user_id, data)
+            return
+        if path == "/api/prompt":
+            self.handle_prompt(room_id, user_id)
+            return
+        if path == "/api/game/roll":
+            self.handle_game_roll(room_id, user_id, data)
+            return
+        if path == "/api/game/reset":
+            self.handle_game_reset(room_id, user_id, data)
+            return
+        if path == "/api/host/claim":
+            self.handle_host_claim(room_id, user_id)
+            return
+
+        self.send_error(HTTPStatus.NOT_FOUND)
+
+    def handle_join(self, data: dict) -> None:
+        name = str(data.get("name", "")).strip()[:24] or "Guest"
+        email = clean_email(str(data.get("email", "")))
+        avatar = str(data.get("avatar", "")).strip()[:8] or "🎧"
+        vibe = str(data.get("vibe", "")).strip()[:24] or "Ready"
+        requested_room = str(data.get("roomId", "")).strip()
+        if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+            self.json_response({"error": "Enter a valid email to continue."}, HTTPStatus.BAD_REQUEST)
+            return
+        with lock:
+            prune_rooms()
+            room_id, room = get_or_create_room(requested_room)
+            if len(room["users"]) >= MAX_USERS:
+                self.json_response({"error": "This room already has 5 people."}, HTTPStatus.CONFLICT)
+                return
+            account = accounts.setdefault(
+                email,
+                {"id": secrets.token_urlsafe(12), "email": email, "createdAt": now_ms(), "sessions": []},
+            )
+            account.update({"name": name, "avatar": avatar, "vibe": vibe, "lastSeen": now_ms()})
+            session_token = secrets.token_urlsafe(32)
+            sessions = account.setdefault("sessions", [])
+            sessions.append({"token": session_token, "at": now_ms()})
+            account["sessions"] = sessions[-5:]
+            save_accounts()
+            user_id = secrets.token_urlsafe(12)
+            user = {
+                "id": user_id,
+                "accountId": account["id"],
+                "email": email,
+                "sessionToken": session_token,
+                "name": name,
+                "avatar": avatar,
+                "vibe": vibe,
+                "joinedAt": now_ms(),
+                "lastSeen": now_ms(),
+                "badges": ["Founder"] if not room["users"] else [],
+                "stats": {"chats": 0, "reactions": 0, "queueAdds": 0},
+            }
+            room["users"][user_id] = user
+            if not room.get("hostId"):
+                room["hostId"] = user_id
+                award_badges(user, "DJ")
+            make_event(room, "system", {"message": f"{avatar} {name} joined the room."})
+            make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+            snapshot = room_snapshot(room_id, room)
+        self.json_response({"user": user, "room": snapshot})
+
+    def handle_leave(self, data: dict) -> None:
+        room_id = clean_room_id(str(data.get("roomId", "")))
+        user_id = str(data.get("userId", ""))
+        session_token = str(data.get("sessionToken", ""))
+        with lock:
+            room = rooms.get(room_id)
+            if room and user_id in room["users"]:
+                if not valid_session(room["users"][user_id], session_token):
+                    self.json_response({"error": "Login expired. Please join the room again."}, HTTPStatus.UNAUTHORIZED)
+                    return
+                user = room["users"][user_id]
+                del room["users"][user_id]
+                if room.get("hostId") == user_id:
+                    room["hostId"] = next(iter(room["users"]), None)
+                    if room["hostId"]:
+                        award_badges(room["users"][room["hostId"]], "DJ")
+                make_event(room, "system", {"message": f"{user.get('avatar', '🎧')} {user['name']} left the room."})
+                make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+                room["lastSeen"] = now_ms()
+        self.json_response({"ok": True})
+
+    def handle_chat(self, room_id: str, user_id: str, data: dict) -> None:
+        text = str(data.get("text", "")).strip()[:400]
+        if not text:
+            self.json_response({"error": "Message is empty"}, HTTPStatus.BAD_REQUEST)
+            return
+        with lock:
+            room = rooms[room_id]
+            user = room["users"][user_id]
+            user["stats"]["chats"] += 1
+            if user["stats"]["chats"] >= 5:
+                award_badges(user, "Chat Star")
+            room.get("typing", {}).pop(user_id, None)
+            make_event(room, "chat", {"userId": user_id, "name": user["name"], "avatar": user.get("avatar", "🎧"), "text": text})
+            make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+        self.json_response({"ok": True})
+
+    def handle_control(self, room_id: str, user_id: str, data: dict) -> None:
+        action = str(data.get("action", ""))
+        position = max(0, float(data.get("position", 0) or 0))
+        video_id = clean_video_id(str(data.get("videoId", "")))
+        with lock:
+            room = rooms[room_id]
+            user = room["users"][user_id]
+            if action == "load":
+                if not re.match(r"^[a-zA-Z0-9_-]{6,20}$", video_id):
+                    self.json_response({"error": "Invalid YouTube video ID"}, HTTPStatus.BAD_REQUEST)
+                    return
+                room["state"].update({"videoId": video_id, "status": "playing", "position": 0, "updatedAt": now_ms()})
+                room["history"].append({"videoId": video_id, "title": str(data.get("title", "YouTube video"))[:140], "by": user["name"], "at": now_ms()})
+                room["history"] = room["history"][-12:]
+            elif action in {"play", "pause", "seek"}:
+                room["state"].update({"status": "playing" if action == "play" else "paused", "position": position, "updatedAt": now_ms()})
+            else:
+                self.json_response({"error": "Unknown control action"}, HTTPStatus.BAD_REQUEST)
+                return
+            make_event(room, "control", {"userId": user_id, "name": user["name"], "action": action, **room["state"]})
+            make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+            snapshot = room_snapshot(room_id, room)
+        self.json_response({"ok": True, "room": snapshot})
+
+    def handle_theme(self, room_id: str, user_id: str, data: dict) -> None:
+        theme = str(data.get("theme", "party"))
+        if theme not in THEMES:
+            self.json_response({"error": "Unknown theme"}, HTTPStatus.BAD_REQUEST)
+            return
+        with lock:
+            room = rooms[room_id]
+            user = room["users"][user_id]
+            room["theme"] = theme
+            make_event(room, "theme", {"theme": theme, "name": THEMES[theme]["name"], "emoji": THEMES[theme]["emoji"], "by": user["name"]})
+            make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+            snapshot = room_snapshot(room_id, room)
+        self.json_response({"ok": True, "room": snapshot})
+
+    def handle_mix(self, room_id: str, user_id: str, data: dict) -> None:
+        def bounded_int(name: str, fallback: int, low: int, high: int) -> int:
+            try:
+                value = int(float(data.get(name, fallback)))
+            except (TypeError, ValueError):
+                value = fallback
+            return max(low, min(high, value))
+
+        mix = {
+            "bass": bounded_int("bass", DEFAULT_MIX["bass"], 0, 100),
+            "volume": bounded_int("volume", DEFAULT_MIX["volume"], 0, 100),
+        }
+        with lock:
+            room = rooms[room_id]
+            user = room["users"][user_id]
+            room["mix"] = mix
+            make_event(room, "mix", {"userId": user_id, "name": user["name"], "mix": mix})
+            make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+            snapshot = room_snapshot(room_id, room)
+        self.json_response({"ok": True, "room": snapshot})
+
+    def handle_queue_add(self, room_id: str, user_id: str, data: dict) -> None:
+        video_id = clean_video_id(str(data.get("videoId", "")))
+        title = str(data.get("title", "YouTube video")).strip()[:140] or "YouTube video"
+        thumbnail = str(data.get("thumbnail", f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg")).strip()[:220]
+        if not re.match(r"^[a-zA-Z0-9_-]{6,20}$", video_id):
+            self.json_response({"error": "Invalid YouTube video ID"}, HTTPStatus.BAD_REQUEST)
+            return
+        with lock:
+            room = rooms[room_id]
+            user = room["users"][user_id]
+            item = {
+                "id": secrets.token_urlsafe(8),
+                "videoId": video_id,
+                "title": title,
+                "thumbnail": thumbnail,
+                "addedBy": user["name"],
+                "addedById": user_id,
+                "addedAt": now_ms(),
+                "votes": [user_id],
+            }
+            room["queue"].append(item)
+            room["queue"] = room["queue"][-30:]
+            user["stats"]["queueAdds"] += 1
+            award_badges(user, "Curator")
+            make_event(room, "queue", {"message": f"{user['name']} added “{title}” to the queue."})
+            make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+            snapshot = room_snapshot(room_id, room)
+        self.json_response({"ok": True, "room": snapshot})
+
+    def handle_queue_vote(self, room_id: str, user_id: str, data: dict) -> None:
+        item_id = str(data.get("itemId", ""))
+        with lock:
+            room = rooms[room_id]
+            for item in room["queue"]:
+                if item["id"] == item_id:
+                    votes = item.setdefault("votes", [])
+                    if user_id in votes:
+                        votes.remove(user_id)
+                    else:
+                        votes.append(user_id)
+                    break
+            make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+            snapshot = room_snapshot(room_id, room)
+        self.json_response({"ok": True, "room": snapshot})
+
+    def handle_queue_play(self, room_id: str, user_id: str, data: dict) -> None:
+        item_id = str(data.get("itemId", ""))
+        with lock:
+            room = rooms[room_id]
+            user = room["users"][user_id]
+            item = next((entry for entry in queue_snapshot(room) if entry["id"] == item_id), None)
+            if not item and room["queue"]:
+                item = queue_snapshot(room)[0]
+            if not item:
+                self.json_response({"error": "Queue is empty"}, HTTPStatus.BAD_REQUEST)
+                return
+            room["queue"] = [entry for entry in room["queue"] if entry["id"] != item["id"]]
+            room["state"].update({"videoId": item["videoId"], "status": "playing", "position": 0, "updatedAt": now_ms()})
+            room["history"].append({"videoId": item["videoId"], "title": item["title"], "by": user["name"], "at": now_ms()})
+            make_event(room, "control", {"userId": user_id, "name": user["name"], "action": "load", **room["state"]})
+            make_event(room, "queue", {"message": f"{user['name']} started “{item['title']}” from the queue."})
+            make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+            snapshot = room_snapshot(room_id, room)
+        self.json_response({"ok": True, "room": snapshot})
+
+    def handle_reaction(self, room_id: str, user_id: str, data: dict) -> None:
+        emoji = str(data.get("emoji", "🔥")).strip()[:8]
+        with lock:
+            room = rooms[room_id]
+            user = room["users"][user_id]
+            user["stats"]["reactions"] += 1
+            if user["stats"]["reactions"] >= 5:
+                award_badges(user, "Top Reactor")
+            make_event(room, "reaction", {"emoji": emoji, "name": user["name"], "avatar": user.get("avatar", "🎧")})
+            make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+        self.json_response({"ok": True})
+
+    def handle_typing(self, room_id: str, user_id: str, data: dict) -> None:
+        with lock:
+            room = rooms[room_id]
+            user = room["users"][user_id]
+            if data.get("typing"):
+                room["typing"][user_id] = {"name": user["name"], "until": now_ms() + 3500}
+            else:
+                room["typing"].pop(user_id, None)
+            make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+        self.json_response({"ok": True})
+
+    def handle_prompt(self, room_id: str, user_id: str) -> None:
+        with lock:
+            room = rooms[room_id]
+            index = int(time.time()) % len(PROMPTS)
+            room["prompt"] = {"text": PROMPTS[index], "at": now_ms(), "by": room["users"][user_id]["name"]}
+            make_event(room, "prompt", room["prompt"])
+            make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+            snapshot = room_snapshot(room_id, room)
+        self.json_response({"ok": True, "room": snapshot})
+
+    def handle_game_roll(self, room_id: str, user_id: str, data: dict) -> None:
+        game = str(data.get("game", ""))
+        if game not in {"ludo", "snakes"}:
+            self.json_response({"error": "Unknown game"}, HTTPStatus.BAD_REQUEST)
+            return
+        with lock:
+            room = rooms[room_id]
+            games = normalize_games(room)
+            players = room_game_players(room)
+            if user_id not in {player.get("id") for player in players}:
+                self.json_response({"error": "Join the first 4 players to play this round."}, HTTPStatus.FORBIDDEN)
+                return
+            game_state = games[game]
+            active_index = game_state["turn"] % len(players)
+            active_user = players[active_index]
+            if active_user.get("id") != user_id:
+                self.json_response({"error": f"It is {active_user.get('name', 'another player')}'s turn."}, HTTPStatus.CONFLICT)
+                return
+            roll = roll_dice()
+            if game == "ludo":
+                message, extra_turn = self.apply_ludo_roll(game_state, players, active_index, roll)
+            else:
+                message, extra_turn = self.apply_snakes_roll(game_state, players, active_index, roll)
+            game_state["lastRoll"] = roll
+            game_state["message"] = message
+            game_state["updatedAt"] = now_ms()
+            if not extra_turn:
+                game_state["turn"] = (game_state["turn"] + 1) % len(players)
+            payload = {"game": game, "message": message, "roll": roll, "by": active_user.get("name", "Player"), "snapshot": games_snapshot(room)}
+            make_event(room, "game", payload)
+            make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+            snapshot = room_snapshot(room_id, room)
+        self.json_response({"ok": True, "room": snapshot, "message": message, "roll": roll})
+
+    def apply_ludo_roll(self, game_state: dict, players: list[dict], player_index: int, roll: int) -> tuple[str, bool]:
+        if game_state.get("winner"):
+            return f"{game_state['winner']} already brought all pawns HOME. Reset for a new round.", False
+        player = players[player_index]
+        pawns = game_state["pawns"]
+        candidates = ludo_move_candidates(pawns, player_index, roll)
+        if not candidates:
+            all_locked = all(position < 0 for position in pawns[player_index])
+            reason = "Need a 6 to open a pawn." if all_locked and roll != 6 else "No legal move; exact roll is needed near HOME."
+            return f"{player['name']} rolled {roll}. {reason}", roll == 6
+        move = choose_ludo_move(candidates)
+        pawns[player_index][move["pawnIndex"]] = move["to"]
+        captured = capture_ludo_rival(pawns, players, player_index, move["pawnIndex"])
+        if all(position == 57 for position in pawns[player_index]):
+            game_state["winner"] = player["name"]
+            return f"{player['name']} brought all 4 pawns HOME and won Ludo.", False
+        if move["from"] < 0:
+            action = f"opened pawn {move['pawnIndex'] + 1}"
+        elif move["to"] == 57:
+            action = f"sent pawn {move['pawnIndex'] + 1} HOME"
+        else:
+            action = f"moved pawn {move['pawnIndex'] + 1}"
+        capture_text = f" Captured {captured}'s pawn." if captured else ""
+        extra = roll == 6
+        return f"{player['name']} rolled {roll} and {action}.{capture_text}{' Roll again.' if extra else ''}", extra
+
+    def apply_snakes_roll(self, game_state: dict, players: list[dict], player_index: int, roll: int) -> tuple[str, bool]:
+        if game_state.get("winner"):
+            return f"{game_state['winner']} already won. Reset for a new round.", False
+        player = players[player_index]
+        current = game_state["positions"][player_index] or 1
+        if current + roll > 100:
+            return f"{player['name']} rolled {roll}. Exact roll needed for 100.", roll == 6
+        next_position = current + roll
+        jump = snake_jumps().get(next_position)
+        jump_text = ""
+        if jump:
+            jump_text = f" climbed {next_position} to {jump['to']}" if jump["type"] == "ladder" else f" slid {next_position} to {jump['to']}"
+            next_position = jump["to"]
+        game_state["positions"][player_index] = next_position
+        if next_position == 100:
+            game_state["winner"] = player["name"]
+            return f"{player['name']} landed on 100 and won Snake & Ladder.", False
+        extra = roll == 6
+        return f"{player['name']} rolled {roll}{jump_text}.{' Roll again.' if extra else ''}", extra
+
+    def handle_game_reset(self, room_id: str, user_id: str, data: dict) -> None:
+        game = str(data.get("game", ""))
+        if game not in {"ludo", "snakes"}:
+            self.json_response({"error": "Unknown game"}, HTTPStatus.BAD_REQUEST)
+            return
+        with lock:
+            room = rooms[room_id]
+            players = room_game_players(room)
+            games = normalize_games(room)
+            user = room["users"][user_id]
+            if game == "ludo":
+                games["ludo"] = default_games(len(players))["ludo"]
+                message = f"{user['name']} reset Ludo."
+            else:
+                games["snakes"] = default_games(len(players))["snakes"]
+                message = f"{user['name']} reset Snake & Ladder."
+            make_event(room, "game", {"game": game, "message": message, "by": user["name"], "snapshot": games_snapshot(room)})
+            make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+            snapshot = room_snapshot(room_id, room)
+        self.json_response({"ok": True, "room": snapshot})
+
+    def handle_host_claim(self, room_id: str, user_id: str) -> None:
+        with lock:
+            room = rooms[room_id]
+            room["hostId"] = user_id
+            user = room["users"][user_id]
+            award_badges(user, "DJ")
+            make_event(room, "system", {"message": f"{user['name']} is hosting now."})
+            make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+            snapshot = room_snapshot(room_id, room)
+        self.json_response({"ok": True, "room": snapshot})
+
+    def require_member(self, data: dict) -> tuple[str | None, str | None]:
+        room_id = clean_room_id(str(data.get("roomId", "")))
+        user_id = str(data.get("userId", ""))
+        session_token = str(data.get("sessionToken", ""))
+        with lock:
+            room = rooms.get(room_id)
+            if not room or user_id not in room["users"]:
+                self.json_response({"error": "Room or user not found"}, HTTPStatus.NOT_FOUND)
+                return None, None
+            if not valid_session(room["users"][user_id], session_token):
+                self.json_response({"error": "Login expired. Please join the room again."}, HTTPStatus.UNAUTHORIZED)
+                return None, None
+            room["lastSeen"] = now_ms()
+            room["users"][user_id]["lastSeen"] = now_ms()
+        return room_id, user_id
+
+    def serve_static(self, path: str, include_body: bool = True) -> None:
+        target = PUBLIC / ("index.html" if path in {"", "/"} else path.lstrip("/"))
+        try:
+            target = target.resolve()
+            target.relative_to(PUBLIC)
+        except ValueError:
+            self.send_error(HTTPStatus.FORBIDDEN)
+            return
+        if not target.exists() or not target.is_file():
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        content_type = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+        data = target.read_bytes()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        if include_body:
+            self.wfile.write(data)
+
+    def json_response(self, payload: dict, status: HTTPStatus = HTTPStatus.OK) -> None:
+        data = json.dumps(payload).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
+
+    def log_message(self, format: str, *args) -> None:
+        print("[%s] %s" % (self.log_date_time_string(), format % args))
+
+
+def main() -> None:
+    load_rooms()
+    load_accounts()
+    host = os.environ.get("HOST", "127.0.0.1")
+    port = int(os.environ.get("PORT", "8080"))
+    server = ThreadingHTTPServer((host, port), WatchPartyHandler)
+    print(f"YouTube Watch Party running at http://{host}:{port}")
+    server.serve_forever()
+
+
+if __name__ == "__main__":
+    main()

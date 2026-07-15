@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>YouTube Watch Party</title>
+    <link rel="stylesheet" href="/styles.css?v=today-fix-1">
+  </head>
+  <body class="theme-party">
+    <main class="app-shell">
+      <section id="joinView" class="login-view">
+        <div class="login-copy">
+          <div class="brand-row">
+            <div class="brand-mark">▶</div>
+            <span>Campus watch rooms</span>
+            <strong class="status-pill">Live</strong>
+          </div>
+          <h1>Watch YouTube together, live.</h1>
+          <p>Invite up to 5 friends, search YouTube, sync playback, chat, react, and play quick room games while the video runs.</p>
+          <div class="feature-strip">
+            <span>Synced playback</span>
+            <span>YouTube search</span>
+            <span>Live chat</span>
+            <span>Room reactions</span>
+          </div>
+          <section class="public-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="eyebrow">Discover</span>
+                <h3>Live campus rooms</h3>
+              </div>
+              <button id="refreshRoomsBtn" class="ghost-button" type="button">Refresh</button>
+            </div>
+            <div id="publicRooms" class="public-rooms"></div>
+          </section>
+        </div>
+
+        <form id="joinForm" class="login-card">
+          <div class="card-glow"></div>
+          <div class="login-card-head">
+            <span class="eyebrow">Your Login</span>
+            <h2>Enter party mode</h2>
+          </div>
+
+          <label>
+            Display name
+            <input id="nameInput" maxlength="24" placeholder="Aarav" autocomplete="name" required>
+          </label>
+
+          <label>
+            Email
+            <input id="emailInput" type="email" maxlength="120" placeholder="you@college.edu" autocomplete="email" required>
+          </label>
+
+          <label>
+            Room code
+            <input id="roomInput" maxlength="32" placeholder="Leave empty to create one">
+          </label>
+
+          <label>
+            Current mood
+            <input id="vibeInput" maxlength="24" placeholder="Chill, hyped, cozy...">
+          </label>
+
+          <fieldset class="avatar-field">
+            <legend>Pick your avatar</legend>
+            <div id="avatarPicker" class="avatar-picker">
+              <button type="button" class="selected" data-avatar="🎧">🎧</button>
+              <button type="button" data-avatar="🔥">🔥</button>
+              <button type="button" data-avatar="✨">✨</button>
+              <button type="button" data-avatar="😎">😎</button>
+              <button type="button" data-avatar="🍿">🍿</button>
+              <button type="button" data-avatar="💃">💃</button>
+            </div>
+          </fieldset>
+
+          <button type="submit" class="primary-button">Join party</button>
+          <p id="joinError" class="error-text" role="alert"></p>
+        </form>
+      </section>
+
+      <section id="partyView" class="party-view hidden">
+        <header class="topbar">
+          <div>
+            <span class="eyebrow">Room</span>
+            <strong class="status-pill room-status">Live room</strong>
+            <h2 id="roomCode">-</h2>
+            <div id="roomMeta" class="room-meta">Party room</div>
+          </div>
+          <div class="room-actions">
+            <button id="copyLinkBtn" class="secondary-button">Copy link</button>
+            <button id="claimHostBtn" class="secondary-button">Become host</button>
+            <button id="leaveBtn" class="ghost-button">Leave</button>
+          </div>
+        </header>
+
+        <section class="launch-strip" aria-label="Room status">
+          <strong>Live watch room</strong>
+          <span>5 seats max</span>
+          <span>Synced YouTube playback</span>
+          <span>Live chat and reactions</span>
+          <a id="subscribeLink" class="subscribe-link hidden" href="#" target="_blank" rel="noreferrer">Subscribe</a>
+        </section>
+
+        <section class="theme-panel">
+          <button data-theme="late-night">🌙 Late Night</button>
+          <button data-theme="study-lofi">📚 Study Lofi</button>
+          <button data-theme="party">🔥 Party</button>
+          <button data-theme="movie">🍿 Movie</button>
+          <button data-theme="heartbreak">💔 Heartbreak</button>
+          <button data-theme="anime">✨ Anime</button>
+        </section>
+
+        <section class="watch-layout">
+          <div class="main-stack">
+            <section class="player-panel">
+              <div class="video-frame">
+                <div id="player"></div>
+                <div id="playerOverlay" class="player-overlay">Loading YouTube player...</div>
+                <div id="reactionLayer" class="reaction-layer" aria-hidden="true"></div>
+                <div class="reaction-dock">
+                  <button data-reaction="🔥">🔥</button>
+                  <button data-reaction="😂">😂</button>
+                  <button data-reaction="😭">😭</button>
+                  <button data-reaction="❤️">❤️</button>
+                  <button data-reaction="💯">💯</button>
+                </div>
+              </div>
+
+              <form id="videoForm" class="video-form">
+                <input id="videoInput" placeholder="Paste a YouTube URL or video ID" aria-label="YouTube URL or video ID">
+                <button type="submit" class="primary-button">Load</button>
+              </form>
+
+              <div class="controls-row">
+                <button id="playBtn" class="control-button">Play</button>
+                <button id="pauseBtn" class="control-button">Pause</button>
+                <button id="syncBtn" class="secondary-button">Sync me</button>
+                <span id="statusText" class="status-text">Paused at 0:00</span>
+              </div>
+
+              <section class="sound-console simple-sound" aria-label="Sound controls">
+                <div class="sound-console-head">
+                  <div>
+                    <span class="eyebrow">Sound</span>
+                    <h3>Bass boost and volume</h3>
+                  </div>
+                  <div class="mix-badge">
+                    <span>Room sound</span>
+                    <strong id="mixQualityLabel">Ready</strong>
+                  </div>
+                </div>
+
+                <div class="sound-meter" aria-hidden="true">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+
+                <div class="mix-controls compact-controls sound-control-grid">
+                  <label class="mix-control">
+                    <span>Bass Boost</span>
+                    <input id="bassBoostInput" type="range" min="0" max="100" value="40">
+                    <strong id="bassBoostValue">40</strong>
+                    <small>Shared room boost</small>
+                  </label>
+                  <label class="mix-control">
+                    <span>Volume</span>
+                    <input id="volumeInput" type="range" min="0" max="100" value="85">
+                    <strong id="volumeValue">85%</strong>
+                    <small>Controls YouTube volume here</small>
+                  </label>
+                </div>
+              </section>
+            </section>
+
+            <section class="search-panel">
+              <div class="panel-heading">
+                <div>
+                  <span class="eyebrow">Find Next</span>
+                  <h3>YouTube search</h3>
+                </div>
+                <a id="youtubeSearchLink" href="https://www.youtube.com" target="_blank" rel="noreferrer">Open YouTube</a>
+              </div>
+              <form id="searchForm" class="search-form">
+                <input id="searchInput" placeholder="Search songs, trailers, podcasts..." aria-label="Search YouTube">
+                <button type="submit" class="secondary-button">Search</button>
+              </form>
+              <div class="quick-music" aria-label="Quick music moods">
+                <button type="button" data-quick-search="lofi study music">📚 Study</button>
+                <button type="button" data-quick-search="party hits music">🔥 Party</button>
+                <button type="button" data-quick-search="hindi lofi songs">🎧 Hindi lofi</button>
+                <button type="button" data-quick-search="chill edm music">🌊 Chill EDM</button>
+                <button type="button" data-quick-search="anime opening songs">✨ Anime</button>
+                <button type="button" data-quick-search="love songs acoustic">💗 Love</button>
+              </div>
+              <p id="searchStatus" class="search-status">Search or tap a mood, then play music instantly for everyone.</p>
+              <div id="searchResults" class="search-results"></div>
+            </section>
+
+            <section class="queue-panel">
+              <div class="panel-heading">
+                <div>
+                  <span class="eyebrow">Up Next</span>
+                  <h3>Next queue</h3>
+                </div>
+                <button id="playQueueBtn" class="ghost-button" type="button">Play top</button>
+              </div>
+              <div id="queueList" class="queue-list empty-note">Add songs from search to build the next queue.</div>
+            </section>
+
+            <section class="prompt-card games-panel secondary-feature">
+              <div class="panel-heading">
+                <div>
+                  <span class="eyebrow">Room Games</span>
+                  <h3>Room extras</h3>
+                </div>
+                <button id="newPromptBtn" class="ghost-button" type="button">New prompt</button>
+              </div>
+              <div class="game-tabs" aria-label="Mini game selector">
+                <button type="button" data-game-tab="ludo">Ludo</button>
+                <button type="button" data-game-tab="snakes">Snake & Ladder</button>
+                <button type="button" data-game-tab="prompt">Vibe prompt</button>
+              </div>
+              <p id="promptText" class="hidden">Rate this video out of 10.</p>
+              <div id="ludoGame" class="mini-game">
+                <div class="game-head">
+                  <strong>Ludo</strong>
+                  <span id="ludoStatus">Roll dice. First player to bring all 4 pawns HOME wins.</span>
+                </div>
+                <div class="game-rule">
+                  <strong>Rules:</strong>
+                  <span>Each player has 4 pawns. Roll 6 to open a pawn, capture rivals on unsafe squares, and bring all 4 pawns HOME with exact rolls.</span>
+                </div>
+                <div id="ludoTrack" class="ludo-track"></div>
+                <div class="game-action">
+                  <span id="ludoDice" class="dice-chip" aria-hidden="true">🎲</span>
+                  <button id="ludoRollBtn" class="secondary-button" type="button">Roll Ludo dice</button>
+                  <button id="ludoResetBtn" class="ghost-button" type="button">Reset</button>
+                </div>
+              </div>
+              <div id="snakesGame" class="mini-game hidden">
+                <div class="game-head">
+                  <strong>Snake & Ladder</strong>
+                  <span id="snakesStatus">Roll dice. Reach 100 to win.</span>
+                </div>
+                <div class="game-rule">
+                  <strong>Rules:</strong>
+                  <span>Roll exact number to land on 100. Ladders climb up, snakes slide down, and a 6 gives one more turn.</span>
+                </div>
+                <div id="snakesBoard" class="snakes-board"></div>
+                <div class="game-action">
+                  <span id="snakesDice" class="dice-chip" aria-hidden="true">🎲</span>
+                  <button id="snakesRollBtn" class="secondary-button" type="button">Roll Snake dice</button>
+                  <button id="snakesResetBtn" class="ghost-button" type="button">Reset</button>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <aside class="side-panel">
+            <div class="people-card">
+              <div class="panel-heading">
+                <div>
+                  <span class="eyebrow">Squad</span>
+                  <h3>People</h3>
+                </div>
+                <span id="peopleCount">0/5</span>
+              </div>
+              <div id="peopleList" class="people-list"></div>
+            </div>
+
+            <div class="history-card">
+              <div class="panel-heading">
+                <div>
+                  <span class="eyebrow">Replay</span>
+                  <h3>Watch history</h3>
+                </div>
+              </div>
+              <div id="historyList" class="history-list empty-note">Nothing watched yet.</div>
+            </div>
+
+            <div class="chat-card">
+              <div class="panel-heading">
+                <div>
+                  <span class="eyebrow">Mood</span>
+                  <h3>Chat</h3>
+                </div>
+                <span id="typingText">Live</span>
+              </div>
+              <div id="chatLog" class="chat-log" aria-live="polite"></div>
+              <div class="moods" aria-label="Quick mood reactions">
+                <button data-mood="🔥 Loved that">🔥 Loved that</button>
+                <button data-mood="🔁 Replay this">🔁 Replay this</button>
+                <button data-mood="✨ So good">✨ So good</button>
+              </div>
+              <div id="emojiPicker" class="emoji-picker" aria-label="Emoji picker">
+                <button type="button" data-emoji="😂">😂</button>
+                <button type="button" data-emoji="😍">😍</button>
+                <button type="button" data-emoji="🔥">🔥</button>
+                <button type="button" data-emoji="👏">👏</button>
+                <button type="button" data-emoji="😭">😭</button>
+                <button type="button" data-emoji="🎶">🎶</button>
+                <button type="button" data-emoji="🍿">🍿</button>
+                <button type="button" data-emoji="💯">💯</button>
+              </div>
+              <form id="chatForm" class="chat-form">
+                <input id="chatInput" maxlength="400" placeholder="Type a message or add emoji..." aria-label="Chat message">
+                <button type="submit" class="primary-button">Send</button>
+              </form>
+            </div>
+          </aside>
+        </section>
+      </section>
+      <footer class="app-footer">
+        <span>Live rooms</span>
+        <a href="/privacy.html">Privacy</a>
+        <a href="/terms.html">Terms</a>
+      </footer>
+    </main>
+
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script src="/app.js?v=today-fix-1"></script>
+  </body>
+</html>
