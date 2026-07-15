@@ -763,6 +763,9 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
         if path == "/api/auth/request-otp":
             self.handle_request_otp(data)
             return
+        if path == "/api/auth/public-login":
+            self.handle_public_login(data)
+            return
         if path == "/api/auth/verify-otp":
             self.handle_verify_otp(data)
             return
@@ -825,6 +828,28 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
 
         self.send_error(HTTPStatus.NOT_FOUND)
 
+    def create_account_session(self, account: dict) -> str:
+        token = secrets.token_urlsafe(32)
+        prune_account_sessions(account)
+        account.setdefault("sessions", []).append({"token": token, "at": now_ms(), "expiresAt": now_ms() + SESSION_TTL_MS})
+        account["lastSeen"] = now_ms()
+        return token
+
+    def handle_public_login(self, data: dict) -> None:
+        email = clean_email(str(data.get("email", "")))
+        if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+            self.json_response({"error": "Enter a valid email address."}, HTTPStatus.BAD_REQUEST)
+            return
+        with lock:
+            account = ensure_account(email)
+            if rate_limited(account, "public-login", OTP_REQUEST_LIMIT):
+                save_accounts()
+                self.json_response({"error": "Too many login attempts. Please wait a minute."}, HTTPStatus.TOO_MANY_REQUESTS)
+                return
+            token = self.create_account_session(account)
+            save_accounts()
+            self.json_response({"sessionToken": token, "account": public_account(account)})
+
     def handle_request_otp(self, data: dict) -> None:
         email = clean_email(str(data.get("email", "")))
         if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
@@ -865,11 +890,8 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
                 save_accounts()
                 self.json_response({"error": "Invalid OTP. Check the six digits and try again."}, HTTPStatus.UNAUTHORIZED)
                 return
-            token = secrets.token_urlsafe(32)
-            prune_account_sessions(account)
-            account.setdefault("sessions", []).append({"token": token, "at": now_ms(), "expiresAt": now_ms() + SESSION_TTL_MS})
+            token = self.create_account_session(account)
             account.pop("pendingOtp", None)
-            account["lastSeen"] = now_ms()
             save_accounts()
             self.json_response({"sessionToken": token, "account": public_account(account)})
 

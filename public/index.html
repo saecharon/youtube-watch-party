@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>YouTube Watch Party</title>
-    <link rel="stylesheet" href="/styles.css?v=youth-redesign-1">
+    <link rel="stylesheet" href="/styles.css?v=no-otp-test-1">
   </head>
   <body class="theme-party">
     <main class="app-shell">
@@ -45,44 +45,25 @@
         <section class="login-card auth-card">
           <div class="card-glow"></div>
           <div id="authWelcome" class="auth-step">
-            <span class="eyebrow">Secure entry</span>
+            <span class="eyebrow">Public test login</span>
             <h2>Continue to your rooms</h2>
-            <p class="muted-copy">We will verify your email first. No room, chat, queue, or controls are shown before login.</p>
+            <p class="muted-copy">Email login is open for testing. Enter your email, create your profile, and join a room instantly.</p>
             <button id="continueEmailBtn" type="button" class="primary-button">Continue with Email</button>
             <button id="loginEmailBtn" type="button" class="ghost-button">Login for existing users</button>
           </div>
 
           <form id="emailForm" class="auth-step hidden">
             <div class="login-card-head">
-              <span class="eyebrow">Email OTP</span>
+              <span class="eyebrow">Public login</span>
               <h2>Enter your email</h2>
             </div>
             <label>
               Email address
               <input id="authEmailInput" type="email" maxlength="120" placeholder="you@college.edu" autocomplete="email" required>
             </label>
-            <button type="submit" class="primary-button">Send OTP</button>
+            <button type="submit" class="primary-button">Continue</button>
             <button id="backToWelcomeBtn" type="button" class="ghost-button">Back</button>
             <p id="emailError" class="error-text" role="alert"></p>
-          </form>
-
-          <form id="otpForm" class="auth-step hidden">
-            <div class="login-card-head">
-              <span class="eyebrow">Verify</span>
-              <h2>Enter 6-digit OTP</h2>
-            </div>
-            <div class="otp-grid" aria-label="One time password">
-              <input class="otp-digit" inputmode="numeric" maxlength="1" aria-label="OTP digit 1">
-              <input class="otp-digit" inputmode="numeric" maxlength="1" aria-label="OTP digit 2">
-              <input class="otp-digit" inputmode="numeric" maxlength="1" aria-label="OTP digit 3">
-              <input class="otp-digit" inputmode="numeric" maxlength="1" aria-label="OTP digit 4">
-              <input class="otp-digit" inputmode="numeric" maxlength="1" aria-label="OTP digit 5">
-              <input class="otp-digit" inputmode="numeric" maxlength="1" aria-label="OTP digit 6">
-            </div>
-            <p id="devOtpNote" class="dev-otp-note hidden"></p>
-            <button type="submit" class="primary-button">Verify OTP</button>
-            <button id="resendOtpBtn" type="button" class="ghost-button">Resend in 60s</button>
-            <p id="otpError" class="error-text" role="alert"></p>
           </form>
 
           <form id="profileForm" class="auth-step hidden">
@@ -443,6 +424,6 @@
     </main>
 
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script src="/app.js?v=youth-redesign-1"></script>
+    <script src="/app.js?v=no-otp-test-1"></script>
   </body>
 </html>

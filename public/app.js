@@ -16,8 +16,6 @@ const state = {
   localMixUntil: 0,
   auth: null,
   profile: null,
-  pendingEmail: "",
-  resendTimer: null,
   nicknameTimer: null,
   nicknameAvailable: false,
 };
@@ -36,11 +34,6 @@ const emailForm = $("#emailForm");
 const authEmailInput = $("#authEmailInput");
 const emailError = $("#emailError");
 const backToWelcomeBtn = $("#backToWelcomeBtn");
-const otpForm = $("#otpForm");
-const otpDigits = Array.from(document.querySelectorAll(".otp-digit"));
-const devOtpNote = $("#devOtpNote");
-const resendOtpBtn = $("#resendOtpBtn");
-const otpError = $("#otpError");
 const profileForm = $("#profileForm");
 const nicknameInput = $("#nicknameInput");
 const nicknameStatus = $("#nicknameStatus");
@@ -172,62 +165,12 @@ emailForm?.addEventListener("submit", async (event) => {
   emailError.textContent = "";
   const email = authEmailInput.value.trim();
   try {
-    const data = await api("/api/auth/request-otp", { email });
-    state.pendingEmail = email;
-    showAuthStep("otp");
-    clearOtp();
-    devOtpNote.textContent = data.message || "OTP sent. Check your email for the six-digit code.";
-    devOtpNote.classList.remove("hidden");
-    startResendTimer();
-    otpDigits[0]?.focus();
-  } catch (error) {
-    emailError.textContent = error.message;
-  }
-});
-
-otpDigits.forEach((input, index) => {
-  input.addEventListener("input", () => {
-    input.value = input.value.replace(/\D/g, "").slice(0, 1);
-    if (input.value && otpDigits[index + 1]) otpDigits[index + 1].focus();
-  });
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "Backspace" && !input.value && otpDigits[index - 1]) otpDigits[index - 1].focus();
-  });
-  input.addEventListener("paste", (event) => {
-    const pasted = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
-    if (!pasted) return;
-    event.preventDefault();
-    otpDigits.forEach((digit, digitIndex) => {
-      digit.value = pasted[digitIndex] || "";
-    });
-    otpDigits[Math.min(pasted.length, 6) - 1]?.focus();
-  });
-});
-
-otpForm?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  otpError.textContent = "";
-  const otp = otpDigits.map((input) => input.value).join("");
-  try {
-    const data = await api("/api/auth/verify-otp", { email: state.pendingEmail, otp });
+    const data = await api("/api/auth/public-login", { email });
     setAuthSession(data.sessionToken, data.account);
     if (data.account.profileComplete) showHome();
     else showAuthStep("profile");
   } catch (error) {
-    otpError.textContent = error.message;
-  }
-});
-
-resendOtpBtn?.addEventListener("click", async () => {
-  if (resendOtpBtn.disabled || !state.pendingEmail) return;
-  emailError.textContent = "";
-  try {
-    const data = await api("/api/auth/request-otp", { email: state.pendingEmail });
-    devOtpNote.textContent = data.message || "OTP sent. Check your email for the six-digit code.";
-    devOtpNote.classList.remove("hidden");
-    startResendTimer();
-  } catch (error) {
-    otpError.textContent = error.message;
+    emailError.textContent = error.message;
   }
 });
 
@@ -454,9 +397,8 @@ function showAuthStep(step) {
   joinView.classList.remove("hidden");
   homeView.classList.add("hidden");
   partyView.classList.add("hidden");
-  [authWelcome, emailForm, otpForm, profileForm].forEach((element) => element?.classList.add("hidden"));
+  [authWelcome, emailForm, profileForm].forEach((element) => element?.classList.add("hidden"));
   if (step === "email") emailForm.classList.remove("hidden");
-  else if (step === "otp") otpForm.classList.remove("hidden");
   else if (step === "profile") profileForm.classList.remove("hidden");
   else authWelcome.classList.remove("hidden");
 }
@@ -534,30 +476,6 @@ async function restoreAuthSession() {
     localStorage.removeItem("watchPartySession");
     showAuthStep("welcome");
   }
-}
-
-function clearOtp() {
-  otpDigits.forEach((input) => {
-    input.value = "";
-  });
-  otpError.textContent = "";
-}
-
-function startResendTimer() {
-  clearInterval(state.resendTimer);
-  let remaining = 60;
-  resendOtpBtn.disabled = true;
-  resendOtpBtn.textContent = `Resend in ${remaining}s`;
-  state.resendTimer = setInterval(() => {
-    remaining -= 1;
-    if (remaining <= 0) {
-      clearInterval(state.resendTimer);
-      resendOtpBtn.disabled = false;
-      resendOtpBtn.textContent = "Resend OTP";
-      return;
-    }
-    resendOtpBtn.textContent = `Resend in ${remaining}s`;
-  }, 1000);
 }
 
 function validateNicknameText(nickname) {
