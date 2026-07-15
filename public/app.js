@@ -28,6 +28,8 @@ const joinView = $("#joinView");
 const homeView = $("#homeView");
 const partyView = $("#partyView");
 const authWelcome = $("#authWelcome");
+const heroStartBtn = $("#heroStartBtn");
+const heroJoinBtn = $("#heroJoinBtn");
 const continueEmailBtn = $("#continueEmailBtn");
 const loginEmailBtn = $("#loginEmailBtn");
 const emailForm = $("#emailForm");
@@ -45,6 +47,10 @@ const nicknameStatus = $("#nicknameStatus");
 const displayNameInput = $("#displayNameInput");
 const statusInput = $("#statusInput");
 const profileError = $("#profileError");
+const profilePreviewAvatar = $("#profilePreviewAvatar");
+const profilePreviewNickname = $("#profilePreviewNickname");
+const profilePreviewName = $("#profilePreviewName");
+const profilePreviewStatus = $("#profilePreviewStatus");
 const homeAvatar = $("#homeAvatar");
 const homeNickname = $("#homeNickname");
 const logoutBtn = $("#logoutBtn");
@@ -147,6 +153,8 @@ renderDjConsole();
 
 refreshRoomsBtn?.addEventListener("click", loadPublicRooms);
 
+heroStartBtn?.addEventListener("click", () => showAuthStep("email"));
+heroJoinBtn?.addEventListener("click", () => showAuthStep("email"));
 continueEmailBtn?.addEventListener("click", () => showAuthStep("email"));
 loginEmailBtn?.addEventListener("click", () => showAuthStep("email"));
 backToWelcomeBtn?.addEventListener("click", () => showAuthStep("welcome"));
@@ -156,6 +164,7 @@ avatarPicker?.addEventListener("click", (event) => {
   if (!button) return;
   state.selectedAvatar = button.dataset.avatar;
   avatarPicker.querySelectorAll("button").forEach((item) => item.classList.toggle("selected", item === button));
+  renderProfilePreview();
 });
 
 emailForm?.addEventListener("submit", async (event) => {
@@ -235,7 +244,12 @@ nicknameInput?.addEventListener("input", () => {
   }
   nicknameStatus.textContent = "Checking availability...";
   nicknameStatus.className = "field-status";
+  renderProfilePreview();
   state.nicknameTimer = setTimeout(checkNicknameAvailability, 350);
+});
+
+[displayNameInput, statusInput].forEach((input) => {
+  input?.addEventListener("input", renderProfilePreview);
 });
 
 profileForm?.addEventListener("submit", async (event) => {
@@ -490,6 +504,17 @@ function hydrateHomeProfile() {
       button.classList.toggle("selected", button.dataset.avatar === profile.avatar);
     });
   }
+}
+
+function renderProfilePreview() {
+  if (!profilePreviewAvatar) return;
+  const nickname = nicknameInput?.value.trim() || "nickname";
+  const displayName = displayNameInput?.value.trim() || "Your display name";
+  const status = statusInput?.value.trim() || "Ready to watch 🎬";
+  profilePreviewAvatar.textContent = state.selectedAvatar || "🎧";
+  profilePreviewNickname.textContent = `@${nickname}`;
+  profilePreviewName.textContent = displayName;
+  profilePreviewStatus.textContent = status;
 }
 
 async function restoreAuthSession() {

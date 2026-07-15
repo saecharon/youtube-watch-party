@@ -4,24 +4,38 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>YouTube Watch Party</title>
-    <link rel="stylesheet" href="/styles.css?v=release-auth-1">
+    <link rel="stylesheet" href="/styles.css?v=youth-redesign-1">
   </head>
   <body class="theme-party">
     <main class="app-shell">
       <section id="joinView" class="login-view auth-view">
         <div class="login-copy">
+          <div class="hero-orbit" aria-hidden="true">
+            <span class="float-emoji emoji-one">🔥</span>
+            <span class="float-emoji emoji-two">😂</span>
+            <span class="float-emoji emoji-three">🎉</span>
+            <div class="mini-thumb thumb-one"></div>
+            <div class="mini-thumb thumb-two"></div>
+            <div class="glow-avatar avatar-one">🎧</div>
+            <div class="glow-avatar avatar-two">🍿</div>
+          </div>
           <div class="brand-row">
             <div class="brand-mark">▶</div>
             <span>YouTube Watch Party</span>
           </div>
-          <h1>Watch together, wherever you are.</h1>
-          <p>A private social room for friends to play the same YouTube videos, chat live, react, and queue the next vibe.</p>
+          <h1>Watch. Chat. Play. Together.</h1>
+          <p>Create a room, invite your people, watch YouTube, chat live, and play games together.</p>
           <div class="feature-strip">
-            <span>Up to 5 friends</span>
-            <span>Email OTP login</span>
-            <span>Synced rooms</span>
-            <span>Emoji chat</span>
+            <span>Free to join</span>
+            <span>Works on mobile</span>
+            <span>Live emoji chat</span>
+            <span>Synced YouTube</span>
           </div>
+          <div class="hero-actions">
+            <button id="heroStartBtn" type="button" class="primary-button">Get Started</button>
+            <button id="heroJoinBtn" type="button" class="secondary-button">Join a Room</button>
+          </div>
+          <p class="trust-line">Free to join • Works on mobile and desktop</p>
           <div class="legal-row">
             <a href="/privacy.html">Privacy Policy</a>
             <a href="/terms.html">Terms and Conditions</a>
@@ -30,6 +44,13 @@
 
         <section class="login-card auth-card">
           <div class="card-glow"></div>
+          <div class="auth-progress" aria-label="Account setup progress">
+            <span class="active">Email</span>
+            <span>OTP</span>
+            <span>Nickname</span>
+            <span>Avatar</span>
+            <span>Ready</span>
+          </div>
           <div id="authWelcome" class="auth-step">
             <span class="eyebrow">Secure entry</span>
             <h2>Continue to your rooms</h2>
@@ -100,6 +121,14 @@
                 <button type="button" data-avatar="💃">💃</button>
               </div>
             </fieldset>
+            <div class="profile-preview-card">
+              <span id="profilePreviewAvatar">🎧</span>
+              <div>
+                <strong id="profilePreviewNickname">@nickname</strong>
+                <p id="profilePreviewName">Your display name</p>
+                <small id="profilePreviewStatus">Ready to watch 🎬</small>
+              </div>
+            </div>
             <button type="submit" class="primary-button">Save profile</button>
             <p id="profileError" class="error-text" role="alert"></p>
           </form>
@@ -123,15 +152,25 @@
         </header>
 
         <section class="home-grid">
+          <article class="home-card welcome-banner">
+            <span class="eyebrow">Welcome back</span>
+            <h2>Start a watch room in seconds.</h2>
+            <p>Bring your friends in, search music or movies, and keep the vibe synced.</p>
+          </article>
+
           <form id="joinForm" class="login-card home-card">
             <div class="login-card-head">
-              <span class="eyebrow">Room</span>
-              <h2>Create or join</h2>
+              <span class="eyebrow">Join Room</span>
+              <h2>Enter invite code</h2>
             </div>
             <label>
               Room code
               <input id="roomInput" maxlength="32" placeholder="Leave empty to create new room">
             </label>
+            <div class="room-shortcuts">
+              <button type="button" class="ghost-button">Paste invite</button>
+              <button type="button" class="ghost-button">QR scan soon</button>
+            </div>
             <input id="nameInput" class="hidden" aria-hidden="true">
             <input id="emailInput" class="hidden" aria-hidden="true">
             <input id="vibeInput" class="hidden" aria-hidden="true">
@@ -139,16 +178,30 @@
             <p id="joinError" class="error-text" role="alert"></p>
           </form>
 
-          <article class="home-card feature-card">
-            <span class="eyebrow">Ready for release</span>
-            <h2>Clean room flow</h2>
-            <p>Search YouTube, build the queue, chat with emoji, invite friends, and keep the room capped at 5 people.</p>
+          <article class="home-card feature-card create-room-card">
+            <span class="big-icon">＋</span>
+            <span class="eyebrow">Create Room</span>
+            <h2>Start watching with friends</h2>
+            <p>New private room, 5 seats max, instant share link.</p>
+          </article>
+
+          <article class="home-card feature-card public-room-card">
+            <span class="eyebrow">Trending public rooms</span>
+            <h2>Live music night</h2>
+            <p><strong class="live-dot">Live</strong> Music • 3/5 people • hosted by @campusdj</p>
+            <div class="equalizer" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+          </article>
+
+          <article class="home-card feature-card notifications-card">
+            <span class="eyebrow">Stay connected</span>
+            <h2>Notifications</h2>
+            <p>Room invites, mentions, game turns, and queue starts will appear here.</p>
           </article>
 
           <article class="home-card feature-card muted-feature">
-            <span class="eyebrow">Coming next</span>
-            <h2>Games and push alerts</h2>
-            <p>Snake & Ladder, browser notifications, and advanced room settings will return only after they are rebuilt properly.</p>
+            <span class="eyebrow">Games lobby</span>
+            <h2>Snake & Ladder coming back polished</h2>
+            <p>Hidden until it has the proper board, secure dice, and animations.</p>
           </article>
         </section>
       </section>
@@ -397,6 +450,6 @@
     </main>
 
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script src="/app.js?v=release-auth-1"></script>
+    <script src="/app.js?v=youth-redesign-1"></script>
   </body>
 </html>
