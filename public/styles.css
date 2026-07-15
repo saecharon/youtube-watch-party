@@ -366,33 +366,6 @@ a {
   gap: 14px;
 }
 
-.auth-progress {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-.auth-progress span {
-  min-height: 25px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  color: var(--muted);
-  background: rgba(255, 255, 255, 0.055);
-  font-size: 0.67rem;
-  font-weight: 1000;
-}
-
-.auth-progress span.active,
-.auth-progress span:first-child {
-  border-color: rgba(255, 60, 172, 0.58);
-  color: white;
-  background: var(--hot-gradient);
-}
-
 .auth-step h2 {
   margin: 6px 0 0;
   font-size: 2rem;
