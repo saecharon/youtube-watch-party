@@ -14,12 +14,40 @@ const state = {
   mix: { bass: 40, volume: 85 },
   mixSyncTimer: null,
   localMixUntil: 0,
+  auth: null,
+  profile: null,
+  pendingEmail: "",
+  resendTimer: null,
+  nicknameTimer: null,
+  nicknameAvailable: false,
 };
 
 const $ = (selector) => document.querySelector(selector);
 
 const joinView = $("#joinView");
+const homeView = $("#homeView");
 const partyView = $("#partyView");
+const authWelcome = $("#authWelcome");
+const continueEmailBtn = $("#continueEmailBtn");
+const loginEmailBtn = $("#loginEmailBtn");
+const emailForm = $("#emailForm");
+const authEmailInput = $("#authEmailInput");
+const emailError = $("#emailError");
+const backToWelcomeBtn = $("#backToWelcomeBtn");
+const otpForm = $("#otpForm");
+const otpDigits = Array.from(document.querySelectorAll(".otp-digit"));
+const devOtpNote = $("#devOtpNote");
+const resendOtpBtn = $("#resendOtpBtn");
+const otpError = $("#otpError");
+const profileForm = $("#profileForm");
+const nicknameInput = $("#nicknameInput");
+const nicknameStatus = $("#nicknameStatus");
+const displayNameInput = $("#displayNameInput");
+const statusInput = $("#statusInput");
+const profileError = $("#profileError");
+const homeAvatar = $("#homeAvatar");
+const homeNickname = $("#homeNickname");
+const logoutBtn = $("#logoutBtn");
 const joinForm = $("#joinForm");
 const joinError = $("#joinError");
 const nameInput = $("#nameInput");
@@ -113,38 +141,142 @@ window.onYouTubeIframeAPIReady = () => {
   });
 };
 
-restoreProfile();
+restoreAuthSession();
 loadAppConfig();
-loadPublicRooms();
 renderDjConsole();
 
-refreshRoomsBtn.addEventListener("click", loadPublicRooms);
+refreshRoomsBtn?.addEventListener("click", loadPublicRooms);
 
-avatarPicker.addEventListener("click", (event) => {
+continueEmailBtn?.addEventListener("click", () => showAuthStep("email"));
+loginEmailBtn?.addEventListener("click", () => showAuthStep("email"));
+backToWelcomeBtn?.addEventListener("click", () => showAuthStep("welcome"));
+
+avatarPicker?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-avatar]");
   if (!button) return;
   state.selectedAvatar = button.dataset.avatar;
   avatarPicker.querySelectorAll("button").forEach((item) => item.classList.toggle("selected", item === button));
 });
 
-joinForm.addEventListener("submit", async (event) => {
+emailForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  emailError.textContent = "";
+  const email = authEmailInput.value.trim();
+  try {
+    const data = await api("/api/auth/request-otp", { email });
+    state.pendingEmail = email;
+    showAuthStep("otp");
+    clearOtp();
+    devOtpNote.textContent = data.message || "OTP sent. Check your email for the six-digit code.";
+    devOtpNote.classList.remove("hidden");
+    startResendTimer();
+    otpDigits[0]?.focus();
+  } catch (error) {
+    emailError.textContent = error.message;
+  }
+});
+
+otpDigits.forEach((input, index) => {
+  input.addEventListener("input", () => {
+    input.value = input.value.replace(/\D/g, "").slice(0, 1);
+    if (input.value && otpDigits[index + 1]) otpDigits[index + 1].focus();
+  });
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Backspace" && !input.value && otpDigits[index - 1]) otpDigits[index - 1].focus();
+  });
+  input.addEventListener("paste", (event) => {
+    const pasted = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pasted) return;
+    event.preventDefault();
+    otpDigits.forEach((digit, digitIndex) => {
+      digit.value = pasted[digitIndex] || "";
+    });
+    otpDigits[Math.min(pasted.length, 6) - 1]?.focus();
+  });
+});
+
+otpForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  otpError.textContent = "";
+  const otp = otpDigits.map((input) => input.value).join("");
+  try {
+    const data = await api("/api/auth/verify-otp", { email: state.pendingEmail, otp });
+    setAuthSession(data.sessionToken, data.account);
+    if (data.account.profileComplete) showHome();
+    else showAuthStep("profile");
+  } catch (error) {
+    otpError.textContent = error.message;
+  }
+});
+
+resendOtpBtn?.addEventListener("click", async () => {
+  if (resendOtpBtn.disabled || !state.pendingEmail) return;
+  emailError.textContent = "";
+  try {
+    const data = await api("/api/auth/request-otp", { email: state.pendingEmail });
+    devOtpNote.textContent = data.message || "OTP sent. Check your email for the six-digit code.";
+    devOtpNote.classList.remove("hidden");
+    startResendTimer();
+  } catch (error) {
+    otpError.textContent = error.message;
+  }
+});
+
+nicknameInput?.addEventListener("input", () => {
+  state.nicknameAvailable = false;
+  clearTimeout(state.nicknameTimer);
+  const nickname = nicknameInput.value.trim().toLowerCase();
+  nicknameInput.value = nickname;
+  const localError = validateNicknameText(nickname);
+  if (localError) {
+    nicknameStatus.textContent = localError;
+    nicknameStatus.className = "field-status danger";
+    return;
+  }
+  nicknameStatus.textContent = "Checking availability...";
+  nicknameStatus.className = "field-status";
+  state.nicknameTimer = setTimeout(checkNicknameAvailability, 350);
+});
+
+profileForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  profileError.textContent = "";
+  try {
+    const data = await api("/api/profile", {
+      sessionToken: state.auth?.sessionToken,
+      nickname: nicknameInput.value.trim(),
+      displayName: displayNameInput.value.trim(),
+      avatar: state.selectedAvatar,
+      status: statusInput.value.trim(),
+    });
+    state.profile = data.account;
+    hydrateHomeProfile();
+    showHome();
+  } catch (error) {
+    profileError.textContent = error.message;
+  }
+});
+
+logoutBtn?.addEventListener("click", async () => {
+  const token = state.auth?.sessionToken || localStorage.getItem("watchPartySession");
+  if (token) await api("/api/auth/logout", { sessionToken: token }).catch(() => {});
+  localStorage.removeItem("watchPartySession");
+  state.auth = null;
+  state.profile = null;
+  state.room = null;
+  state.user = null;
+  showAuthStep("welcome");
+});
+
+joinForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   joinError.textContent = "";
   const params = new URLSearchParams(location.search);
-  const profile = { name: nameInput.value.trim(), email: emailInput.value.trim(), avatar: state.selectedAvatar, vibe: vibeInput.value.trim() };
   const roomId = roomInput.value.trim() || params.get("room") || "";
   try {
-    const data = await api("/api/join", { ...profile, roomId });
-    localStorage.setItem("watchPartyProfile", JSON.stringify(profile));
-    state.user = data.user;
-    state.room = data.room;
-    state.lastSeq = data.room.seq;
-    history.replaceState(null, "", `?room=${encodeURIComponent(data.room.roomId)}`);
-    joinView.classList.add("hidden");
-    partyView.classList.remove("hidden");
-    renderRoom(data.room);
-    applySnapshot(data.room);
-    pollEvents();
+    if (!state.auth?.sessionToken) throw new Error("Please log in first.");
+    const data = await api("/api/join", { authSessionToken: state.auth.sessionToken, roomId });
+    enterRoom(data);
   } catch (error) {
     joinError.textContent = error.message;
   }
@@ -223,8 +355,12 @@ claimHostBtn.addEventListener("click", async () => {
 });
 
 leaveBtn.addEventListener("click", async () => {
-  if (state.room && state.user) await api("/api/leave", { roomId: state.room.roomId, userId: state.user.id });
-  location.href = location.pathname;
+  if (state.room && state.user) await api("/api/leave", authBody()).catch(() => {});
+  state.room = null;
+  state.user = null;
+  clearTimeout(state.pollTimer);
+  history.replaceState(null, "", location.pathname);
+  showHome();
 });
 
 chatInput.addEventListener("input", () => {
@@ -300,27 +436,128 @@ snakesResetBtn.addEventListener("click", async () => {
   await resetRoomGame("snakes", snakesStatus);
 });
 
-window.addEventListener("beforeunload", () => {
-  if (!state.room || !state.user) return;
-  navigator.sendBeacon("/api/leave", new Blob([JSON.stringify(authBody())], { type: "application/json" }));
-});
+function showAuthStep(step) {
+  joinView.classList.remove("hidden");
+  homeView.classList.add("hidden");
+  partyView.classList.add("hidden");
+  [authWelcome, emailForm, otpForm, profileForm].forEach((element) => element?.classList.add("hidden"));
+  if (step === "email") emailForm.classList.remove("hidden");
+  else if (step === "otp") otpForm.classList.remove("hidden");
+  else if (step === "profile") profileForm.classList.remove("hidden");
+  else authWelcome.classList.remove("hidden");
+}
 
-function restoreProfile() {
+function showHome() {
+  hydrateHomeProfile();
+  joinView.classList.add("hidden");
+  partyView.classList.add("hidden");
+  homeView.classList.remove("hidden");
   const params = new URLSearchParams(location.search);
   if (params.get("room")) roomInput.value = params.get("room");
+}
+
+function enterRoom(data) {
+  state.user = data.user;
+  state.room = data.room;
+  state.lastSeq = data.room.seq;
+  history.replaceState(null, "", `?room=${encodeURIComponent(data.room.roomId)}`);
+  joinView.classList.add("hidden");
+  homeView.classList.add("hidden");
+  partyView.classList.remove("hidden");
+  renderRoom(data.room);
+  applySnapshot(data.room);
+  clearTimeout(state.pollTimer);
+  pollEvents();
+}
+
+function setAuthSession(sessionToken, account) {
+  state.auth = { sessionToken };
+  state.profile = account;
+  localStorage.setItem("watchPartySession", sessionToken);
+  hydrateHomeProfile();
+}
+
+function hydrateHomeProfile() {
+  const profile = state.profile || {};
+  homeAvatar.textContent = profile.avatar || "🎧";
+  homeNickname.textContent = profile.nickname ? `@${profile.nickname}` : "@profile";
+  if (nameInput) nameInput.value = profile.displayName || profile.nickname || "";
+  if (emailInput) emailInput.value = profile.email || "";
+  if (vibeInput) vibeInput.value = profile.status || "Ready";
+  if (profile.avatar && avatarPicker) {
+    state.selectedAvatar = profile.avatar;
+    avatarPicker.querySelectorAll("button").forEach((button) => {
+      button.classList.toggle("selected", button.dataset.avatar === profile.avatar);
+    });
+  }
+}
+
+async function restoreAuthSession() {
+  const params = new URLSearchParams(location.search);
+  if (params.get("room")) roomInput.value = params.get("room");
+  const token = localStorage.getItem("watchPartySession");
+  if (!token) {
+    showAuthStep("welcome");
+    return;
+  }
   try {
-    const profile = JSON.parse(localStorage.getItem("watchPartyProfile") || "{}");
-    if (profile.name) nameInput.value = profile.name;
-    if (profile.email) emailInput.value = profile.email;
-    if (profile.vibe) vibeInput.value = profile.vibe;
-    if (profile.avatar) {
-      state.selectedAvatar = profile.avatar;
-      avatarPicker.querySelectorAll("button").forEach((button) => {
-        button.classList.toggle("selected", button.dataset.avatar === profile.avatar);
-      });
-    }
+    const data = await apiGet(`/api/auth/session?token=${encodeURIComponent(token)}`);
+    setAuthSession(token, data.account);
+    if (data.account.profileComplete) showHome();
+    else showAuthStep("profile");
   } catch {
-    localStorage.removeItem("watchPartyProfile");
+    localStorage.removeItem("watchPartySession");
+    showAuthStep("welcome");
+  }
+}
+
+function clearOtp() {
+  otpDigits.forEach((input) => {
+    input.value = "";
+  });
+  otpError.textContent = "";
+}
+
+function startResendTimer() {
+  clearInterval(state.resendTimer);
+  let remaining = 60;
+  resendOtpBtn.disabled = true;
+  resendOtpBtn.textContent = `Resend in ${remaining}s`;
+  state.resendTimer = setInterval(() => {
+    remaining -= 1;
+    if (remaining <= 0) {
+      clearInterval(state.resendTimer);
+      resendOtpBtn.disabled = false;
+      resendOtpBtn.textContent = "Resend OTP";
+      return;
+    }
+    resendOtpBtn.textContent = `Resend in ${remaining}s`;
+  }, 1000);
+}
+
+function validateNicknameText(nickname) {
+  if (nickname.length < 3) return "Nickname must be at least 3 characters.";
+  if (nickname.length > 20) return "Nickname must be 20 characters or less.";
+  if (!/^[a-z0-9_.]+$/.test(nickname)) return "Only letters, numbers, underscore and dot are allowed.";
+  return "";
+}
+
+async function checkNicknameAvailability() {
+  const nickname = nicknameInput.value.trim();
+  const error = validateNicknameText(nickname);
+  if (error) {
+    nicknameStatus.textContent = error;
+    nicknameStatus.className = "field-status danger";
+    return;
+  }
+  try {
+    const data = await apiGet(`/api/nickname/check?nickname=${encodeURIComponent(nickname)}&token=${encodeURIComponent(state.auth?.sessionToken || "")}`);
+    state.nicknameAvailable = Boolean(data.available);
+    nicknameStatus.textContent = data.message || (data.available ? "Nickname available." : "Nickname already taken.");
+    nicknameStatus.className = `field-status ${data.available ? "success" : "danger"}`;
+  } catch (error) {
+    nicknameStatus.textContent = error.message;
+    nicknameStatus.className = "field-status danger";
   }
 }
 
@@ -1323,6 +1560,13 @@ async function api(path, body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Something went wrong");
+  return data;
+}
+
+async function apiGet(path) {
+  const response = await fetch(path);
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || "Something went wrong");
   return data;

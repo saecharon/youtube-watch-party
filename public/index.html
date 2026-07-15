@@ -4,79 +4,153 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>YouTube Watch Party</title>
-    <link rel="stylesheet" href="/styles.css?v=today-fix-1">
+    <link rel="stylesheet" href="/styles.css?v=release-auth-1">
   </head>
   <body class="theme-party">
     <main class="app-shell">
-      <section id="joinView" class="login-view">
+      <section id="joinView" class="login-view auth-view">
         <div class="login-copy">
           <div class="brand-row">
             <div class="brand-mark">▶</div>
-            <span>Campus watch rooms</span>
-            <strong class="status-pill">Live</strong>
+            <span>YouTube Watch Party</span>
           </div>
-          <h1>Watch YouTube together, live.</h1>
-          <p>Invite up to 5 friends, search YouTube, sync playback, chat, react, and play quick room games while the video runs.</p>
+          <h1>Watch together, wherever you are.</h1>
+          <p>A private social room for friends to play the same YouTube videos, chat live, react, and queue the next vibe.</p>
           <div class="feature-strip">
-            <span>Synced playback</span>
-            <span>YouTube search</span>
-            <span>Live chat</span>
-            <span>Room reactions</span>
+            <span>Up to 5 friends</span>
+            <span>Email OTP login</span>
+            <span>Synced rooms</span>
+            <span>Emoji chat</span>
           </div>
-          <section class="public-panel">
-            <div class="panel-heading">
-              <div>
-                <span class="eyebrow">Discover</span>
-                <h3>Live campus rooms</h3>
-              </div>
-              <button id="refreshRoomsBtn" class="ghost-button" type="button">Refresh</button>
-            </div>
-            <div id="publicRooms" class="public-rooms"></div>
-          </section>
+          <div class="legal-row">
+            <a href="/privacy.html">Privacy Policy</a>
+            <a href="/terms.html">Terms and Conditions</a>
+          </div>
         </div>
 
-        <form id="joinForm" class="login-card">
+        <section class="login-card auth-card">
           <div class="card-glow"></div>
-          <div class="login-card-head">
-            <span class="eyebrow">Your Login</span>
-            <h2>Enter party mode</h2>
+          <div id="authWelcome" class="auth-step">
+            <span class="eyebrow">Secure entry</span>
+            <h2>Continue to your rooms</h2>
+            <p class="muted-copy">We will verify your email first. No room, chat, queue, or controls are shown before login.</p>
+            <button id="continueEmailBtn" type="button" class="primary-button">Continue with Email</button>
+            <button id="loginEmailBtn" type="button" class="ghost-button">Login for existing users</button>
           </div>
 
-          <label>
-            Display name
-            <input id="nameInput" maxlength="24" placeholder="Aarav" autocomplete="name" required>
-          </label>
-
-          <label>
-            Email
-            <input id="emailInput" type="email" maxlength="120" placeholder="you@college.edu" autocomplete="email" required>
-          </label>
-
-          <label>
-            Room code
-            <input id="roomInput" maxlength="32" placeholder="Leave empty to create one">
-          </label>
-
-          <label>
-            Current mood
-            <input id="vibeInput" maxlength="24" placeholder="Chill, hyped, cozy...">
-          </label>
-
-          <fieldset class="avatar-field">
-            <legend>Pick your avatar</legend>
-            <div id="avatarPicker" class="avatar-picker">
-              <button type="button" class="selected" data-avatar="🎧">🎧</button>
-              <button type="button" data-avatar="🔥">🔥</button>
-              <button type="button" data-avatar="✨">✨</button>
-              <button type="button" data-avatar="😎">😎</button>
-              <button type="button" data-avatar="🍿">🍿</button>
-              <button type="button" data-avatar="💃">💃</button>
+          <form id="emailForm" class="auth-step hidden">
+            <div class="login-card-head">
+              <span class="eyebrow">Email OTP</span>
+              <h2>Enter your email</h2>
             </div>
-          </fieldset>
+            <label>
+              Email address
+              <input id="authEmailInput" type="email" maxlength="120" placeholder="you@college.edu" autocomplete="email" required>
+            </label>
+            <button type="submit" class="primary-button">Send OTP</button>
+            <button id="backToWelcomeBtn" type="button" class="ghost-button">Back</button>
+            <p id="emailError" class="error-text" role="alert"></p>
+          </form>
 
-          <button type="submit" class="primary-button">Join party</button>
-          <p id="joinError" class="error-text" role="alert"></p>
-        </form>
+          <form id="otpForm" class="auth-step hidden">
+            <div class="login-card-head">
+              <span class="eyebrow">Verify</span>
+              <h2>Enter 6-digit OTP</h2>
+            </div>
+            <div class="otp-grid" aria-label="One time password">
+              <input class="otp-digit" inputmode="numeric" maxlength="1" aria-label="OTP digit 1">
+              <input class="otp-digit" inputmode="numeric" maxlength="1" aria-label="OTP digit 2">
+              <input class="otp-digit" inputmode="numeric" maxlength="1" aria-label="OTP digit 3">
+              <input class="otp-digit" inputmode="numeric" maxlength="1" aria-label="OTP digit 4">
+              <input class="otp-digit" inputmode="numeric" maxlength="1" aria-label="OTP digit 5">
+              <input class="otp-digit" inputmode="numeric" maxlength="1" aria-label="OTP digit 6">
+            </div>
+            <p id="devOtpNote" class="dev-otp-note hidden"></p>
+            <button type="submit" class="primary-button">Verify OTP</button>
+            <button id="resendOtpBtn" type="button" class="ghost-button">Resend in 60s</button>
+            <p id="otpError" class="error-text" role="alert"></p>
+          </form>
+
+          <form id="profileForm" class="auth-step hidden">
+            <div class="login-card-head">
+              <span class="eyebrow">Profile</span>
+              <h2>Claim your identity</h2>
+            </div>
+            <label>
+              Unique nickname
+              <input id="nicknameInput" maxlength="20" placeholder="sai.music" autocomplete="nickname" required>
+            </label>
+            <p id="nicknameStatus" class="field-status">Use lowercase letters, numbers, underscore, or dot.</p>
+            <label>
+              Display name
+              <input id="displayNameInput" maxlength="32" placeholder="Sai Charan" autocomplete="name">
+            </label>
+            <label>
+              Mood or status
+              <input id="statusInput" maxlength="60" placeholder="Ready for music">
+            </label>
+            <fieldset class="avatar-field">
+              <legend>Pick your avatar</legend>
+              <div id="avatarPicker" class="avatar-picker">
+                <button type="button" class="selected" data-avatar="🎧">🎧</button>
+                <button type="button" data-avatar="🔥">🔥</button>
+                <button type="button" data-avatar="✨">✨</button>
+                <button type="button" data-avatar="😎">😎</button>
+                <button type="button" data-avatar="🍿">🍿</button>
+                <button type="button" data-avatar="💃">💃</button>
+              </div>
+            </fieldset>
+            <button type="submit" class="primary-button">Save profile</button>
+            <p id="profileError" class="error-text" role="alert"></p>
+          </form>
+        </section>
+      </section>
+
+      <section id="homeView" class="home-view hidden">
+        <header class="home-topbar">
+          <div class="brand-row">
+            <div class="brand-mark">▶</div>
+            <div>
+              <span class="eyebrow">Home</span>
+              <h1>YouTube Watch Party</h1>
+            </div>
+          </div>
+          <div class="profile-chip">
+            <span id="homeAvatar">🎧</span>
+            <strong id="homeNickname">@guest</strong>
+            <button id="logoutBtn" type="button" class="ghost-button">Logout</button>
+          </div>
+        </header>
+
+        <section class="home-grid">
+          <form id="joinForm" class="login-card home-card">
+            <div class="login-card-head">
+              <span class="eyebrow">Room</span>
+              <h2>Create or join</h2>
+            </div>
+            <label>
+              Room code
+              <input id="roomInput" maxlength="32" placeholder="Leave empty to create new room">
+            </label>
+            <input id="nameInput" class="hidden" aria-hidden="true">
+            <input id="emailInput" class="hidden" aria-hidden="true">
+            <input id="vibeInput" class="hidden" aria-hidden="true">
+            <button type="submit" class="primary-button">Enter watch room</button>
+            <p id="joinError" class="error-text" role="alert"></p>
+          </form>
+
+          <article class="home-card feature-card">
+            <span class="eyebrow">Ready for release</span>
+            <h2>Clean room flow</h2>
+            <p>Search YouTube, build the queue, chat with emoji, invite friends, and keep the room capped at 5 people.</p>
+          </article>
+
+          <article class="home-card feature-card muted-feature">
+            <span class="eyebrow">Coming next</span>
+            <h2>Games and push alerts</h2>
+            <p>Snake & Ladder, browser notifications, and advanced room settings will return only after they are rebuilt properly.</p>
+          </article>
+        </section>
       </section>
 
       <section id="partyView" class="party-view hidden">
@@ -139,7 +213,7 @@
                 <span id="statusText" class="status-text">Paused at 0:00</span>
               </div>
 
-              <section class="sound-console simple-sound" aria-label="Sound controls">
+              <section class="sound-console simple-sound hidden" aria-label="Sound controls">
                 <div class="sound-console-head">
                   <div>
                     <span class="eyebrow">Sound</span>
@@ -212,7 +286,7 @@
               <div id="queueList" class="queue-list empty-note">Add songs from search to build the next queue.</div>
             </section>
 
-            <section class="prompt-card games-panel secondary-feature">
+            <section class="prompt-card games-panel secondary-feature hidden">
               <div class="panel-heading">
                 <div>
                   <span class="eyebrow">Room Games</span>
@@ -273,7 +347,7 @@
               <div id="peopleList" class="people-list"></div>
             </div>
 
-            <div class="history-card">
+            <div class="history-card hidden">
               <div class="panel-heading">
                 <div>
                   <span class="eyebrow">Replay</span>
@@ -323,6 +397,6 @@
     </main>
 
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script src="/app.js?v=today-fix-1"></script>
+    <script src="/app.js?v=release-auth-1"></script>
   </body>
 </html>

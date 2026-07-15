@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import hashlib
 import json
 import mimetypes
 import os
@@ -31,6 +32,12 @@ SUPPORT_EMAIL = os.environ.get("SUPPORT_EMAIL", "support@example.com")
 BUSINESS_NAME = os.environ.get("BUSINESS_NAME", APP_NAME)
 STRIPE_PAYMENT_LINK = os.environ.get("STRIPE_PAYMENT_LINK", "")
 YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY", "")
+AUTH_SECRET = os.environ.get("AUTH_SECRET", APP_NAME)
+OTP_TTL_MS = 10 * 60 * 1000
+SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000
+RATE_WINDOW_MS = 60 * 1000
+OTP_REQUEST_LIMIT = 3
+OTP_VERIFY_LIMIT = 8
 LUDO_SAFE_TILES = {0, 8, 14, 22, 28, 36, 42, 50}
 LUDO_START_OFFSETS = [0, 14, 28, 42]
 
@@ -73,6 +80,103 @@ def clean_video_id(value: str) -> str:
 
 def clean_email(value: str) -> str:
     return value.strip().lower()[:120]
+
+
+def clean_nickname(value: str) -> str:
+    return value.strip().lower()[:24]
+
+
+def nickname_error(nickname: str) -> str:
+    if len(nickname) < 3:
+        return "Nickname must be at least 3 characters."
+    if len(nickname) > 20:
+        return "Nickname must be 20 characters or less."
+    if not re.match(r"^[a-z0-9_.]+$", nickname):
+        return "Only lowercase letters, numbers, underscore and dot are allowed."
+    return ""
+
+
+def otp_digest(email: str, otp: str) -> str:
+    return hashlib.sha256(f"{AUTH_SECRET}:{email}:{otp}".encode("utf-8")).hexdigest()
+
+
+def ensure_account(email: str) -> dict:
+    account = accounts.setdefault(
+        email,
+        {
+            "id": secrets.token_urlsafe(12),
+            "email": email,
+            "createdAt": now_ms(),
+            "sessions": [],
+            "notificationPreferences": {"sounds": True, "browser": False},
+            "soundPreferences": {"volume": 85},
+        },
+    )
+    account.setdefault("sessions", [])
+    account.setdefault("rateLimits", {})
+    account["lastSeen"] = now_ms()
+    return account
+
+
+def public_account(account: dict) -> dict:
+    nickname = account.get("nickname", "")
+    return {
+        "id": account.get("id", ""),
+        "email": account.get("email", ""),
+        "nickname": nickname,
+        "displayName": account.get("displayName") or account.get("name") or nickname,
+        "avatar": account.get("avatar", "🎧"),
+        "status": account.get("status") or account.get("vibe") or "Ready",
+        "profileComplete": bool(nickname),
+        "lastSeenAt": account.get("lastSeen", 0),
+        "notificationPreferences": account.get("notificationPreferences", {"sounds": True, "browser": False}),
+        "soundPreferences": account.get("soundPreferences", {"volume": 85}),
+    }
+
+
+def nickname_taken(nickname: str, account_id: str = "") -> bool:
+    wanted = nickname.lower()
+    for account in accounts.values():
+        if account.get("id") == account_id:
+            continue
+        if str(account.get("nickname", "")).lower() == wanted:
+            return True
+    return False
+
+
+def rate_limited(account: dict, bucket: str, limit: int, window_ms: int = RATE_WINDOW_MS) -> bool:
+    now = now_ms()
+    limits = account.setdefault("rateLimits", {})
+    hits = [item for item in limits.get(bucket, []) if now - int(item) < window_ms]
+    if len(hits) >= limit:
+        limits[bucket] = hits
+        return True
+    hits.append(now)
+    limits[bucket] = hits
+    return False
+
+
+def prune_account_sessions(account: dict) -> None:
+    now = now_ms()
+    sessions = []
+    for session in account.get("sessions", []):
+        expires_at = int(session.get("expiresAt") or (session.get("at", 0) + SESSION_TTL_MS))
+        if expires_at > now:
+            session["expiresAt"] = expires_at
+            sessions.append(session)
+    account["sessions"] = sessions[-8:]
+
+
+def account_by_session(session_token: str) -> dict | None:
+    if not session_token:
+        return None
+    for account in accounts.values():
+        prune_account_sessions(account)
+        for session in account.get("sessions", []):
+            if secrets.compare_digest(str(session.get("token", "")), str(session_token)):
+                account["lastSeen"] = now_ms()
+                return account
+    return None
 
 
 def new_room_id() -> str:
@@ -576,6 +680,33 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
             )
             return
 
+        if path == "/api/auth/session":
+            token = str(query.get("token", [""])[0])
+            with lock:
+                account = account_by_session(token)
+                if not account:
+                    self.json_response({"error": "Session expired. Please log in again."}, HTTPStatus.UNAUTHORIZED)
+                    return
+                save_accounts()
+                self.json_response({"account": public_account(account)})
+            return
+
+        if path == "/api/nickname/check":
+            nickname = clean_nickname(str(query.get("nickname", [""])[0]))
+            token = str(query.get("token", [""])[0])
+            with lock:
+                account = account_by_session(token)
+                if not account:
+                    self.json_response({"error": "Session expired. Please log in again."}, HTTPStatus.UNAUTHORIZED)
+                    return
+                error = nickname_error(nickname)
+                if error:
+                    self.json_response({"available": False, "message": error})
+                    return
+                available = not nickname_taken(nickname, account.get("id", ""))
+                self.json_response({"available": available, "message": "Nickname available." if available else "Nickname already taken."})
+            return
+
         if path == "/api/rooms":
             with lock:
                 prune_rooms()
@@ -629,11 +760,23 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
             self.json_response({"error": "Invalid JSON"}, HTTPStatus.BAD_REQUEST)
             return
 
-        if path == "/api/join":
-            self.handle_join(data)
+        if path == "/api/auth/request-otp":
+            self.handle_request_otp(data)
+            return
+        if path == "/api/auth/verify-otp":
+            self.handle_verify_otp(data)
+            return
+        if path == "/api/auth/logout":
+            self.handle_logout(data)
+            return
+        if path == "/api/profile":
+            self.handle_profile(data)
             return
         if path == "/api/leave":
             self.handle_leave(data)
+            return
+        if path == "/api/join":
+            self.handle_join(data)
             return
 
         room_id, user_id = self.require_member(data)
@@ -682,37 +825,123 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
 
         self.send_error(HTTPStatus.NOT_FOUND)
 
-    def handle_join(self, data: dict) -> None:
-        name = str(data.get("name", "")).strip()[:24] or "Guest"
+    def handle_request_otp(self, data: dict) -> None:
         email = clean_email(str(data.get("email", "")))
-        avatar = str(data.get("avatar", "")).strip()[:8] or "🎧"
-        vibe = str(data.get("vibe", "")).strip()[:24] or "Ready"
-        requested_room = str(data.get("roomId", "")).strip()
         if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
-            self.json_response({"error": "Enter a valid email to continue."}, HTTPStatus.BAD_REQUEST)
+            self.json_response({"error": "Enter a valid email address."}, HTTPStatus.BAD_REQUEST)
             return
         with lock:
+            account = ensure_account(email)
+            if rate_limited(account, "otp-request", OTP_REQUEST_LIMIT):
+                save_accounts()
+                self.json_response({"error": "Too many OTP requests. Please wait a minute."}, HTTPStatus.TOO_MANY_REQUESTS)
+                return
+            otp = f"{secrets.randbelow(1_000_000):06d}"
+            account["pendingOtp"] = {"hash": otp_digest(email, otp), "expiresAt": now_ms() + OTP_TTL_MS, "attempts": 0}
+            save_accounts()
+        # Local fallback only. Production must send this through Supabase/SMTP.
+        print(f"[DEV OTP] {email}: {otp}")
+        self.json_response({"ok": True, "message": "OTP sent. Check your email for the six-digit code."})
+
+    def handle_verify_otp(self, data: dict) -> None:
+        email = clean_email(str(data.get("email", "")))
+        otp = re.sub(r"\D", "", str(data.get("otp", "")))[:6]
+        with lock:
+            account = accounts.get(email)
+            if not account:
+                self.json_response({"error": "Request a fresh OTP first."}, HTTPStatus.BAD_REQUEST)
+                return
+            if rate_limited(account, "otp-verify", OTP_VERIFY_LIMIT):
+                save_accounts()
+                self.json_response({"error": "Too many OTP attempts. Please wait a minute."}, HTTPStatus.TOO_MANY_REQUESTS)
+                return
+            pending = account.get("pendingOtp") or {}
+            if int(pending.get("expiresAt", 0)) < now_ms():
+                self.json_response({"error": "OTP expired. Request a new code."}, HTTPStatus.BAD_REQUEST)
+                return
+            pending["attempts"] = int(pending.get("attempts", 0)) + 1
+            if pending["attempts"] > OTP_VERIFY_LIMIT or not secrets.compare_digest(str(pending.get("hash", "")), otp_digest(email, otp)):
+                account["pendingOtp"] = pending
+                save_accounts()
+                self.json_response({"error": "Invalid OTP. Check the six digits and try again."}, HTTPStatus.UNAUTHORIZED)
+                return
+            token = secrets.token_urlsafe(32)
+            prune_account_sessions(account)
+            account.setdefault("sessions", []).append({"token": token, "at": now_ms(), "expiresAt": now_ms() + SESSION_TTL_MS})
+            account.pop("pendingOtp", None)
+            account["lastSeen"] = now_ms()
+            save_accounts()
+            self.json_response({"sessionToken": token, "account": public_account(account)})
+
+    def handle_logout(self, data: dict) -> None:
+        token = str(data.get("sessionToken", ""))
+        with lock:
+            account = account_by_session(token)
+            if account:
+                account["sessions"] = [session for session in account.get("sessions", []) if not secrets.compare_digest(str(session.get("token", "")), token)]
+                save_accounts()
+        self.json_response({"ok": True})
+
+    def handle_profile(self, data: dict) -> None:
+        token = str(data.get("sessionToken", ""))
+        nickname = clean_nickname(str(data.get("nickname", "")))
+        display_name = str(data.get("displayName", "")).strip()[:32]
+        avatar = str(data.get("avatar", "🎧")).strip()[:8] or "🎧"
+        status = str(data.get("status", "")).strip()[:60] or "Ready"
+        error = nickname_error(nickname)
+        if error:
+            self.json_response({"error": error}, HTTPStatus.BAD_REQUEST)
+            return
+        with lock:
+            account = account_by_session(token)
+            if not account:
+                self.json_response({"error": "Session expired. Please log in again."}, HTTPStatus.UNAUTHORIZED)
+                return
+            if nickname_taken(nickname, account.get("id", "")):
+                self.json_response({"error": "Nickname already taken."}, HTTPStatus.CONFLICT)
+                return
+            account.update(
+                {
+                    "nickname": nickname,
+                    "displayName": display_name or nickname,
+                    "name": display_name or nickname,
+                    "avatar": avatar,
+                    "status": status,
+                    "vibe": status,
+                    "updatedAt": now_ms(),
+                    "lastSeen": now_ms(),
+                }
+            )
+            save_accounts()
+            self.json_response({"account": public_account(account)})
+
+    def handle_join(self, data: dict) -> None:
+        auth_session = str(data.get("authSessionToken", ""))
+        requested_room = str(data.get("roomId", "")).strip()
+        with lock:
+            account = account_by_session(auth_session)
+            if not account:
+                self.json_response({"error": "Please log in before joining a room."}, HTTPStatus.UNAUTHORIZED)
+                return
+            if not account.get("nickname"):
+                self.json_response({"error": "Choose a nickname before joining a room."}, HTTPStatus.FORBIDDEN)
+                return
+            name = account.get("displayName") or account.get("nickname") or "Guest"
+            email = account.get("email", "")
+            avatar = account.get("avatar", "🎧")
+            vibe = account.get("status") or "Ready"
             prune_rooms()
             room_id, room = get_or_create_room(requested_room)
             if len(room["users"]) >= MAX_USERS:
                 self.json_response({"error": "This room already has 5 people."}, HTTPStatus.CONFLICT)
                 return
-            account = accounts.setdefault(
-                email,
-                {"id": secrets.token_urlsafe(12), "email": email, "createdAt": now_ms(), "sessions": []},
-            )
-            account.update({"name": name, "avatar": avatar, "vibe": vibe, "lastSeen": now_ms()})
-            session_token = secrets.token_urlsafe(32)
-            sessions = account.setdefault("sessions", [])
-            sessions.append({"token": session_token, "at": now_ms()})
-            account["sessions"] = sessions[-5:]
             save_accounts()
             user_id = secrets.token_urlsafe(12)
             user = {
                 "id": user_id,
                 "accountId": account["id"],
                 "email": email,
-                "sessionToken": session_token,
+                "sessionToken": auth_session,
                 "name": name,
                 "avatar": avatar,
                 "vibe": vibe,
