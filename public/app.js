@@ -3,6 +3,8 @@ const state = {
   room: null,
   player: null,
   playerReady: false,
+  playerInitStarted: false,
+  playerLoadFallbackShown: false,
   lastSeq: 0,
   suppressPlayerEventsUntil: 0,
   pollTimer: null,
@@ -122,23 +124,35 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-window.onYouTubeIframeAPIReady = () => {
-  state.player = new YT.Player("player", {
-    videoId: "M7lc1UVf-VE",
-    playerVars: { rel: 0, modestbranding: 1, playsinline: 1 },
-    events: {
-      onReady: () => {
-        state.playerReady = true;
-        playerOverlay.classList.add("ready");
-        renderDjConsole();
-        applyDjConsole();
-        if (state.room) applySnapshot(state.room);
+function initYouTubePlayer() {
+  if (state.playerInitStarted || !window.YT?.Player) return;
+  state.playerInitStarted = true;
+  try {
+    state.player = new YT.Player("player", {
+      videoId: "M7lc1UVf-VE",
+      playerVars: { rel: 0, modestbranding: 1, playsinline: 1 },
+      events: {
+        onReady: () => {
+          state.playerReady = true;
+          playerOverlay.classList.add("ready");
+          renderDjConsole();
+          applyDjConsole();
+          if (state.room) applySnapshot(state.room);
+        },
+        onStateChange: handlePlayerStateChange,
+        onError: handlePlayerError,
       },
-      onStateChange: handlePlayerStateChange,
-      onError: handlePlayerError,
-    },
-  });
-};
+    });
+  } catch {
+    state.playerInitStarted = false;
+    showPlayerLoadFallback();
+  }
+}
+
+window.onYouTubeIframeAPIReady = initYouTubePlayer;
+initYouTubePlayer();
+setTimeout(initYouTubePlayer, 500);
+setTimeout(showPlayerLoadFallback, 7000);
 
 restoreAuthSession();
 loadAppConfig();
@@ -562,6 +576,16 @@ function handlePlayerError(event) {
   playerOverlay.classList.add("ready");
 }
 
+function showPlayerLoadFallback() {
+  if (state.playerReady) return;
+  state.playerLoadFallbackShown = true;
+  const videoId = state.room?.videoId || "M7lc1UVf-VE";
+  const watchUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
+  playerOverlay.innerHTML = `YouTube is slow on this device. <a href="${watchUrl}" target="_blank" rel="noreferrer">Open video</a>, then come back and tap Sync me.`;
+  playerOverlay.classList.remove("ready");
+  statusText.innerHTML = `Waiting for YouTube player. <a href="${watchUrl}" target="_blank" rel="noreferrer">Open current video</a>`;
+}
+
 async function loadVideoForRoom(videoId, title = "YouTube video") {
   if (state.playerReady && state.player) {
     state.suppressPlayerEventsUntil = Date.now() + 1200;
@@ -693,6 +717,7 @@ function renderRoom(room) {
   applyGameSnapshot(room.games);
   renderMiniGames();
   renderStatus(room);
+  if (!state.playerReady && state.playerLoadFallbackShown) showPlayerLoadFallback();
 }
 
 function renderThemes(activeTheme) {
