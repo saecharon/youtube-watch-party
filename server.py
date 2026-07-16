@@ -272,7 +272,8 @@ def queue_snapshot(room: dict) -> list[dict]:
 
 
 def room_game_players(room: dict) -> list[dict]:
-    users = list(room["users"].values())[:4]
+    cutoff = now_ms() - 15000
+    users = [user for user in room["users"].values() if user.get("lastSeen", 0) >= cutoff][:4]
     if not users:
         users = [{"id": "", "name": "Player 1", "avatar": "🎧"}]
     return users

@@ -814,7 +814,14 @@ async function resetRoomGame(game, statusElement) {
 }
 
 function gamePlayers() {
-  const users = state.room?.users?.length ? state.room.users : [{ name: "Player 1", avatar: "🎧" }];
+  const roomUsers = state.room?.users || [];
+  let users = roomUsers.filter((user) => user.online !== false);
+  if (!users.length && state.user) {
+    users = [state.user];
+  }
+  if (!users.length) {
+    users = [{ name: "Player 1", avatar: "🎧" }];
+  }
   return users.slice(0, 4).map((user, index) => ({
     id: user.id || "",
     name: user.name || `Player ${index + 1}`,
