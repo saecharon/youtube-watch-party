@@ -39,6 +39,8 @@ RATE_WINDOW_MS = 60 * 1000
 OTP_REQUEST_LIMIT = 3
 OTP_VERIFY_LIMIT = 8
 MAX_CHAT_IMAGE_CHARS = 3_400_000
+LUDO_SAFE_TILES = {0, 8, 13, 21, 26, 34, 39, 47}
+LUDO_START_OFFSETS = [0, 13, 26, 39]
 
 THEMES = {
     "late-night": {"name": "Late Night", "emoji": "🌙"},
@@ -270,6 +272,14 @@ def room_game_players(room: dict) -> list[dict]:
 
 def default_games(count: int = 1) -> dict:
     return {
+        "ludo": {
+            "turn": 0,
+            "pawns": [[-1, -1, -1, -1] for _ in range(count)],
+            "winner": None,
+            "lastRoll": None,
+            "message": "New Ludo round. Roll a 6 to open a pawn.",
+            "updatedAt": now_ms(),
+        },
         "snakes": {
             "turn": 0,
             "positions": [1 for _ in range(count)],
@@ -289,12 +299,35 @@ def normalize_slots(slots: object, count: int, fallback: int) -> list[int]:
     return next_slots
 
 
+def normalize_ludo_pawns(pawns: object, count: int) -> list[list[int]]:
+    source = pawns if isinstance(pawns, list) else []
+    next_pawns = [item for item in source[:count]]
+    while len(next_pawns) < count:
+        next_pawns.append([-1, -1, -1, -1])
+    normalized = []
+    for player_pawns in next_pawns:
+        if not isinstance(player_pawns, list):
+            normalized.append([-1, -1, -1, -1])
+            continue
+        row = [int(value) if isinstance(value, (int, float)) else -1 for value in player_pawns[:4]]
+        while len(row) < 4:
+            row.append(-1)
+        normalized.append([max(-1, min(57, value)) for value in row])
+    return normalized
+
+
 def normalize_games(room: dict) -> dict:
     count = max(1, len(room_game_players(room)))
     games = room.setdefault("games", default_games(count))
+    ludo = games.setdefault("ludo", default_games(count)["ludo"])
     snakes = games.setdefault("snakes", default_games(count)["snakes"])
+    ludo["pawns"] = normalize_ludo_pawns(ludo.get("pawns"), count)
     snakes["positions"] = normalize_slots(snakes.get("positions"), count, 1)
+    ludo["turn"] = int(ludo.get("turn", 0) or 0) % count
     snakes["turn"] = int(snakes.get("turn", 0) or 0) % count
+    ludo.setdefault("winner", None)
+    ludo.setdefault("lastRoll", None)
+    ludo.setdefault("message", "New Ludo round. Roll a 6 to open a pawn.")
     snakes.setdefault("winner", None)
     snakes.setdefault("lastRoll", None)
     snakes.setdefault("message", "New Snake & Ladder round. First exact 100 wins.")
@@ -304,6 +337,14 @@ def normalize_games(room: dict) -> dict:
 def games_snapshot(room: dict) -> dict:
     games = normalize_games(room)
     return {
+        "ludo": {
+            "turn": games["ludo"]["turn"],
+            "pawns": [row[:] for row in games["ludo"]["pawns"]],
+            "winner": games["ludo"].get("winner"),
+            "lastRoll": games["ludo"].get("lastRoll"),
+            "message": games["ludo"].get("message", ""),
+            "updatedAt": games["ludo"].get("updatedAt", now_ms()),
+        },
         "snakes": {
             "turn": games["snakes"]["turn"],
             "positions": games["snakes"]["positions"][:],
@@ -490,6 +531,71 @@ def snake_jumps() -> dict[int, dict]:
         95: {"to": 75, "type": "snake"},
         98: {"to": 79, "type": "snake"},
     }
+
+
+def ludo_board_index(player_index: int, progress: int) -> int:
+    return (progress + LUDO_START_OFFSETS[player_index]) % 52
+
+
+def ludo_capture_count(pawns: list[list[int]], player_index: int, landing_progress: int) -> int:
+    if landing_progress < 0 or landing_progress >= 52:
+        return 0
+    landing = ludo_board_index(player_index, landing_progress)
+    if landing in LUDO_SAFE_TILES:
+        return 0
+    total = 0
+    for rival_index, rival_pawns in enumerate(pawns):
+        if rival_index == player_index:
+            continue
+        total += sum(1 for position in rival_pawns if 0 <= position < 52 and ludo_board_index(rival_index, position) == landing)
+    return total
+
+
+def ludo_candidates(pawns: list[list[int]], player_index: int, roll: int) -> list[dict]:
+    candidates = []
+    for pawn_index, position in enumerate(pawns[player_index]):
+        if position == 57:
+            continue
+        if position < 0:
+            if roll == 6:
+                candidates.append({"pawnIndex": pawn_index, "from": position, "to": 0, "opens": True, "finishes": False, "captures": ludo_capture_count(pawns, player_index, 0)})
+            continue
+        to = position + roll
+        if to <= 57:
+            candidates.append({"pawnIndex": pawn_index, "from": position, "to": to, "opens": False, "finishes": to == 57, "captures": ludo_capture_count(pawns, player_index, to)})
+    return candidates
+
+
+def choose_ludo_move(candidates: list[dict]) -> dict:
+    return sorted(
+        candidates,
+        key=lambda move: (
+            0 if move["finishes"] else 1,
+            -move["captures"],
+            1 if move["opens"] else 0,
+            -move["to"],
+        ),
+    )[0]
+
+
+def capture_ludo_rivals(pawns: list[list[int]], players: list[dict], player_index: int, pawn_index: int) -> str:
+    progress = pawns[player_index][pawn_index]
+    if progress < 0 or progress >= 52:
+        return ""
+    landing = ludo_board_index(player_index, progress)
+    if landing in LUDO_SAFE_TILES:
+        return ""
+    captured = []
+    for rival_index, rival_pawns in enumerate(pawns):
+        if rival_index == player_index:
+            continue
+        for rival_pawn_index, position in enumerate(rival_pawns):
+            if position < 0 or position >= 52:
+                continue
+            if ludo_board_index(rival_index, position) == landing:
+                pawns[rival_index][rival_pawn_index] = -1
+                captured.append(players[rival_index].get("name", f"Player {rival_index + 1}"))
+    return ", ".join(captured)
 
 
 def roll_dice() -> int:
@@ -1036,7 +1142,7 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
 
     def handle_game_roll(self, room_id: str, user_id: str, data: dict) -> None:
         game = str(data.get("game", ""))
-        if game != "snakes":
+        if game not in {"ludo", "snakes"}:
             self.json_response({"error": "Unknown game"}, HTTPStatus.BAD_REQUEST)
             return
         with lock:
@@ -1053,7 +1159,10 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
                 self.json_response({"error": f"It is {active_user.get('name', 'another player')}'s turn."}, HTTPStatus.CONFLICT)
                 return
             roll = roll_dice()
-            message, extra_turn = self.apply_snakes_roll(game_state, players, active_index, roll)
+            if game == "ludo":
+                message, extra_turn = self.apply_ludo_roll(game_state, players, active_index, roll)
+            else:
+                message, extra_turn = self.apply_snakes_roll(game_state, players, active_index, roll)
             game_state["lastRoll"] = roll
             game_state["message"] = message
             game_state["updatedAt"] = now_ms()
@@ -1064,6 +1173,34 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
             make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
             snapshot = room_snapshot(room_id, room)
         self.json_response({"ok": True, "room": snapshot, "message": message, "roll": roll})
+
+    def apply_ludo_roll(self, game_state: dict, players: list[dict], player_index: int, roll: int) -> tuple[str, bool]:
+        if game_state.get("winner"):
+            return f"{game_state['winner']} already won Ludo. Reset for a new round.", False
+        player = players[player_index]
+        pawns = game_state["pawns"]
+        candidates = ludo_candidates(pawns, player_index, roll)
+        if not candidates:
+            locked = all(position < 0 for position in pawns[player_index])
+            reason = "Need a 6 to open a pawn." if locked and roll != 6 else "No legal move; exact roll is needed near HOME."
+            return f"{player['name']} rolled {roll}. {reason}", roll == 6
+        move = choose_ludo_move(candidates)
+        pawns[player_index][move["pawnIndex"]] = move["to"]
+        captured = capture_ludo_rivals(pawns, players, player_index, move["pawnIndex"])
+        if all(position == 57 for position in pawns[player_index]):
+            game_state["winner"] = player["name"]
+            return f"{player['name']} brought all 4 pawns HOME and won Ludo.", False
+        if move["from"] < 0:
+            action = f"opened pawn {move['pawnIndex'] + 1}"
+        elif move["to"] == 57:
+            action = f"sent pawn {move['pawnIndex'] + 1} HOME"
+        elif move["to"] >= 52:
+            action = f"moved pawn {move['pawnIndex'] + 1} into the home lane"
+        else:
+            action = f"moved pawn {move['pawnIndex'] + 1}"
+        capture_text = f" Captured {captured}." if captured else ""
+        extra = roll == 6 or bool(captured) or move["to"] == 57
+        return f"{player['name']} rolled {roll} and {action}.{capture_text}{' Roll again.' if extra else ''}", extra
 
     def apply_snakes_roll(self, game_state: dict, players: list[dict], player_index: int, roll: int) -> tuple[str, bool]:
         if game_state.get("winner"):
@@ -1087,7 +1224,7 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
 
     def handle_game_reset(self, room_id: str, user_id: str, data: dict) -> None:
         game = str(data.get("game", ""))
-        if game != "snakes":
+        if game not in {"ludo", "snakes"}:
             self.json_response({"error": "Unknown game"}, HTTPStatus.BAD_REQUEST)
             return
         with lock:
@@ -1095,8 +1232,9 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
             players = room_game_players(room)
             games = normalize_games(room)
             user = room["users"][user_id]
-            games["snakes"] = default_games(len(players))["snakes"]
-            message = f"{user['name']} reset Snake & Ladder."
+            games[game] = default_games(len(players))[game]
+            label = "Ludo" if game == "ludo" else "Snake & Ladder"
+            message = f"{user['name']} reset {label}."
             make_event(room, "game", {"game": game, "message": message, "by": user["name"], "snapshot": games_snapshot(room)})
             make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
             snapshot = room_snapshot(room_id, room)

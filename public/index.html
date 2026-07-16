@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>YouTube Watch Party</title>
-    <link rel="stylesheet" href="/styles.css?v=chat-media-1">
+    <link rel="stylesheet" href="/styles.css?v=advanced-ludo-1">
   </head>
   <body class="theme-party">
     <main class="app-shell">
@@ -272,6 +272,27 @@
                 </div>
               </div>
               <p id="promptText" class="hidden"></p>
+              <div class="game-tabs" aria-label="Choose room game">
+                <button type="button" data-game-tab="ludo" class="selected">Ludo</button>
+                <button type="button" data-game-tab="snakes">Snake & Ladder</button>
+              </div>
+              <div id="ludoGame" class="mini-game">
+                <div class="game-head">
+                  <strong>Ludo</strong>
+                  <span id="ludoStatus">Roll a 6 to open a pawn.</span>
+                </div>
+                <div class="game-rule">
+                  <strong>Rules:</strong>
+                  <span>Roll 6 to open, safe star tiles protect pawns, captures send rivals home, and all 4 pawns must finish.</span>
+                </div>
+                <div id="ludoBoard" class="ludo-board"></div>
+                <div class="game-action">
+                  <span id="ludoDice" class="dice-chip" aria-hidden="true">🎲</span>
+                  <button id="ludoRollBtn" class="secondary-button" type="button">Roll Ludo dice</button>
+                  <button id="ludoResetBtn" class="ghost-button" type="button">Reset</button>
+                </div>
+                <div id="ludoTurnBadge" class="turn-badge">Waiting for turn</div>
+              </div>
               <div id="snakesGame" class="mini-game">
                 <div class="game-head">
                   <strong>Snake & Ladder</strong>
@@ -358,6 +379,6 @@
     </main>
 
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script src="/app.js?v=chat-media-1"></script>
+    <script src="/app.js?v=advanced-ludo-1"></script>
   </body>
 </html>
