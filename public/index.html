@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>YouTube Watch Party</title>
-    <link rel="stylesheet" href="/styles.css?v=no-otp-test-1">
+    <link rel="stylesheet" href="/styles.css?v=games-visible-1">
   </head>
   <body class="theme-party">
     <main class="app-shell">
@@ -313,7 +313,7 @@
               <div id="queueList" class="queue-list empty-note">Add songs from search to build the next queue.</div>
             </section>
 
-            <section class="prompt-card games-panel secondary-feature hidden">
+            <section class="prompt-card games-panel secondary-feature">
               <div class="panel-heading">
                 <div>
                   <span class="eyebrow">Room Games</span>
@@ -322,12 +322,11 @@
                 <button id="newPromptBtn" class="ghost-button" type="button">New prompt</button>
               </div>
               <div class="game-tabs" aria-label="Mini game selector">
-                <button type="button" data-game-tab="ludo">Ludo</button>
                 <button type="button" data-game-tab="snakes">Snake & Ladder</button>
                 <button type="button" data-game-tab="prompt">Vibe prompt</button>
               </div>
               <p id="promptText" class="hidden">Rate this video out of 10.</p>
-              <div id="ludoGame" class="mini-game">
+              <div id="ludoGame" class="mini-game hidden" aria-hidden="true">
                 <div class="game-head">
                   <strong>Ludo</strong>
                   <span id="ludoStatus">Roll dice. First player to bring all 4 pawns HOME wins.</span>
@@ -424,6 +423,6 @@
     </main>
 
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script src="/app.js?v=no-otp-test-1"></script>
+    <script src="/app.js?v=games-visible-1"></script>
   </body>
 </html>

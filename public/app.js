@@ -8,7 +8,7 @@ const state = {
   pollTimer: null,
   selectedAvatar: "🎧",
   lastTypingAt: 0,
-  activeGame: "prompt",
+  activeGame: "snakes",
   ludo: { turn: 0, pawns: initialLudoPawns(4), winner: null, lastRoll: null },
   snakes: { turn: 0, positions: [1, 1, 1, 1], winner: null, lastRoll: null },
   mix: { bass: 40, volume: 85 },
