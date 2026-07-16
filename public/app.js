@@ -360,7 +360,7 @@ document.querySelectorAll("[data-theme]").forEach((button) => {
   });
 });
 
-newPromptBtn.addEventListener("click", async () => {
+newPromptBtn?.addEventListener("click", async () => {
   const data = await api("/api/prompt", authBody());
   state.room = data.room;
   renderRoom(data.room);
@@ -782,10 +782,11 @@ function renderTyping(room) {
 }
 
 function renderMiniGames() {
+  if (state.activeGame === "prompt") state.activeGame = "ludo";
   document.querySelectorAll("[data-game-tab]").forEach((button) => {
     button.classList.toggle("selected", button.dataset.gameTab === state.activeGame);
   });
-  promptText.classList.toggle("hidden", state.activeGame !== "prompt");
+  promptText?.classList.add("hidden");
   ludoGame.classList.toggle("hidden", state.activeGame !== "ludo");
   snakesGame.classList.toggle("hidden", state.activeGame !== "snakes");
   renderLudo();
@@ -1003,8 +1004,12 @@ function renderLudo() {
   const isMyTurn = activePlayer.id === state.user?.id;
   ludoDice.textContent = diceFace(state.ludo.lastRoll);
   ludoStatus.textContent = state.ludo.message || "New Ludo round. Roll a 6 to open one pawn.";
-  ludoRollBtn.textContent = state.ludo.winner ? "Round finished" : isMyTurn ? "Your turn: Roll dice" : `${activePlayer.name}: Roll dice`;
+  if (!state.ludo.winner && !isMyTurn) {
+    ludoStatus.textContent = `${ludoStatus.textContent} Turn: ${activePlayer.name}.`;
+  }
+  ludoRollBtn.textContent = state.ludo.winner ? "Round finished" : "Your turn: Roll dice";
   ludoRollBtn.disabled = Boolean(state.ludo.winner) || !isMyTurn;
+  ludoRollBtn.classList.toggle("hidden", !state.ludo.winner && !isMyTurn);
   const path = ludoPathPoints();
   const cell = 40;
   const homes = [
@@ -1088,8 +1093,12 @@ function renderSnakes() {
   const isMyTurn = activePlayer.id === state.user?.id;
   snakesDice.textContent = diceFace(state.snakes.lastRoll);
   snakesStatus.textContent = state.snakes.message || "New Snake & Ladder round. First exact 100 wins.";
-  snakesRollBtn.textContent = state.snakes.winner ? "Round finished" : isMyTurn ? "Your turn: Roll dice" : `${activePlayer.name}: Roll dice`;
+  if (!state.snakes.winner && !isMyTurn) {
+    snakesStatus.textContent = `${snakesStatus.textContent} Turn: ${activePlayer.name}.`;
+  }
+  snakesRollBtn.textContent = state.snakes.winner ? "Round finished" : "Your turn: Roll dice";
   snakesRollBtn.disabled = Boolean(state.snakes.winner) || !isMyTurn;
+  snakesRollBtn.classList.toggle("hidden", !state.snakes.winner && !isMyTurn);
   const jumps = snakeJumps();
   const tiles = Array.from({ length: 100 }, (_, item) => {
     const cell = 100 - item;
