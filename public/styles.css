@@ -32,6 +32,7 @@ body {
     radial-gradient(circle at 68% 86%, rgba(36, 229, 163, 0.14), transparent 22rem),
     linear-gradient(135deg, #080812 0%, #101021 54%, #17172d 100%);
   color: var(--text);
+  cursor: default;
 }
 
 body::after {
@@ -105,10 +106,39 @@ input {
 button {
   border: 0;
   cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
 }
 
 a {
   color: var(--accent-2);
+}
+
+a,
+label,
+summary,
+[role="button"],
+.public-room,
+.queue-item,
+.search-result,
+.game-tabs button,
+.primary-button,
+.secondary-button,
+.ghost-button,
+.control-button,
+.avatar-picker button,
+.emoji-picker button,
+.theme-panel button,
+.quick-music button,
+.reaction-dock button,
+.moods button {
+  cursor: pointer;
+}
+
+input,
+textarea {
+  cursor: text;
 }
 
 .app-shell {
@@ -1927,6 +1957,14 @@ input:focus {
   text-anchor: middle;
   dominant-baseline: middle;
   stroke: none;
+}
+
+.ludo-track svg,
+.snakes-board svg,
+.ludo-track text,
+.snakes-board text {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 button:disabled {
