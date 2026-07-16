@@ -1520,6 +1520,45 @@ input:focus {
     inset 0 0 0 1px rgba(255, 255, 255, 0.72);
 }
 
+#snakesGame.your-turn {
+  border-color: #00d4ff;
+  box-shadow:
+    0 0 0 3px rgba(0, 212, 255, 0.32),
+    0 0 34px rgba(255, 60, 172, 0.28),
+    0 20px 50px rgba(0, 0, 0, 0.28);
+}
+
+#snakesGame.your-turn .dice-chip {
+  animation: dicePulse 900ms ease-in-out infinite alternate;
+  box-shadow: 0 0 0 4px rgba(255, 60, 172, 0.18), 0 0 28px rgba(0, 212, 255, 0.5);
+}
+
+.turn-badge {
+  justify-self: end;
+  border: 1px solid rgba(29, 24, 32, 0.14);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #1d1820;
+  font-size: 0.82rem;
+  font-weight: 1000;
+}
+
+.turn-badge.active {
+  background: linear-gradient(135deg, #ff3cac, #00d4ff);
+  color: #fff;
+  box-shadow: 0 0 24px rgba(255, 60, 172, 0.5);
+}
+
+@keyframes dicePulse {
+  from {
+    transform: translateY(0) scale(1);
+  }
+  to {
+    transform: translateY(-2px) scale(1.07);
+  }
+}
+
 #snakesGame .game-head strong,
 #snakesGame .game-head span,
 #snakesGame .game-rule,
@@ -1978,6 +2017,15 @@ input:focus {
 
 .svg-token {
   filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.4));
+}
+
+.snake-token.active {
+  filter: drop-shadow(0 0 12px rgba(255, 60, 172, 0.95)) drop-shadow(0 0 18px rgba(0, 212, 255, 0.8));
+}
+
+.snake-token.active circle {
+  stroke: #fff;
+  stroke-width: 5;
 }
 
 .svg-token circle {

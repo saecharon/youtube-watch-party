@@ -83,16 +83,16 @@ def clean_email(value: str) -> str:
 
 
 def clean_nickname(value: str) -> str:
-    return value.strip().lower()[:24]
+    return re.sub(r"\s+", " ", value.strip())[:24]
 
 
 def nickname_error(nickname: str) -> str:
-    if len(nickname) < 3:
-        return "Nickname must be at least 3 characters."
-    if len(nickname) > 20:
-        return "Nickname must be 20 characters or less."
-    if not re.match(r"^[a-z0-9_.]+$", nickname):
-        return "Only lowercase letters, numbers, underscore and dot are allowed."
+    if len(nickname) < 2:
+        return "Name must be at least 2 characters."
+    if len(nickname) > 24:
+        return "Name must be 24 characters or less."
+    if not re.match(r"^[A-Za-z0-9 ._-]+$", nickname):
+        return "Use letters, numbers, spaces, dot, underscore, or hyphen."
     return ""
 
 
@@ -124,7 +124,7 @@ def public_account(account: dict) -> dict:
         "id": account.get("id", ""),
         "email": account.get("email", ""),
         "nickname": nickname,
-        "displayName": account.get("displayName") or account.get("name") or nickname,
+        "displayName": nickname,
         "avatar": account.get("avatar", "🎧"),
         "status": account.get("status") or account.get("vibe") or "Ready",
         "profileComplete": bool(nickname),
@@ -132,16 +132,6 @@ def public_account(account: dict) -> dict:
         "notificationPreferences": account.get("notificationPreferences", {"sounds": True, "browser": False}),
         "soundPreferences": account.get("soundPreferences", {"volume": 85}),
     }
-
-
-def nickname_taken(nickname: str, account_id: str = "") -> bool:
-    wanted = nickname.lower()
-    for account in accounts.values():
-        if account.get("id") == account_id:
-            continue
-        if str(account.get("nickname", "")).lower() == wanted:
-            return True
-    return False
 
 
 def rate_limited(account: dict, bucket: str, limit: int, window_ms: int = RATE_WINDOW_MS) -> bool:
@@ -692,22 +682,6 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
                 self.json_response({"account": public_account(account)})
             return
 
-        if path == "/api/nickname/check":
-            nickname = clean_nickname(str(query.get("nickname", [""])[0]))
-            token = str(query.get("token", [""])[0])
-            with lock:
-                account = account_by_session(token)
-                if not account:
-                    self.json_response({"error": "Session expired. Please log in again."}, HTTPStatus.UNAUTHORIZED)
-                    return
-                error = nickname_error(nickname)
-                if error:
-                    self.json_response({"available": False, "message": error})
-                    return
-                available = not nickname_taken(nickname, account.get("id", ""))
-                self.json_response({"available": available, "message": "Nickname available." if available else "Nickname already taken."})
-            return
-
         if path == "/api/rooms":
             with lock:
                 prune_rooms()
@@ -920,14 +894,11 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
             if not account:
                 self.json_response({"error": "Session expired. Please log in again."}, HTTPStatus.UNAUTHORIZED)
                 return
-            if nickname_taken(nickname, account.get("id", "")):
-                self.json_response({"error": "Nickname already taken."}, HTTPStatus.CONFLICT)
-                return
             account.update(
                 {
                     "nickname": nickname,
-                    "displayName": display_name or nickname,
-                    "name": display_name or nickname,
+                    "displayName": nickname,
+                    "name": nickname,
                     "avatar": avatar,
                     "status": status,
                     "vibe": status,
@@ -949,7 +920,7 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
             if not account.get("nickname"):
                 self.json_response({"error": "Choose a nickname before joining a room."}, HTTPStatus.FORBIDDEN)
                 return
-            name = account.get("displayName") or account.get("nickname") or "Guest"
+            name = account.get("nickname") or "Guest"
             email = account.get("email", "")
             avatar = account.get("avatar", "🎧")
             vibe = account.get("status") or "Ready"

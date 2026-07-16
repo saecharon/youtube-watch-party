@@ -8,9 +8,10 @@ const state = {
   lastSeq: 0,
   suppressPlayerEventsUntil: 0,
   pollTimer: null,
+  wasDisconnected: false,
   selectedAvatar: "🎧",
   lastTypingAt: 0,
-  activeGame: "ludo",
+  activeGame: "snakes",
   ludo: { turn: 0, pawns: initialLudoPawns(4), winner: null, lastRoll: null },
   snakes: { turn: 0, positions: [1, 1, 1, 1], winner: null, lastRoll: null },
   mix: { bass: 40, volume: 85 },
@@ -40,7 +41,6 @@ const profileForm = $("#profileForm");
 const nicknameInput = $("#nicknameInput");
 const nicknameStatus = $("#nicknameStatus");
 const displayNameInput = $("#displayNameInput");
-const statusInput = $("#statusInput");
 const profileError = $("#profileError");
 const profilePreviewAvatar = $("#profilePreviewAvatar");
 const profilePreviewNickname = $("#profilePreviewNickname");
@@ -97,6 +97,7 @@ const snakesStatus = $("#snakesStatus");
 const snakesDice = $("#snakesDice");
 const snakesRollBtn = $("#snakesRollBtn");
 const snakesResetBtn = $("#snakesResetBtn");
+const turnBadge = $("#turnBadge");
 const historyList = $("#historyList");
 const chatLog = $("#chatLog");
 const chatForm = $("#chatForm");
@@ -164,11 +165,9 @@ renderDjConsole();
 
 refreshRoomsBtn?.addEventListener("click", loadPublicRooms);
 
-heroStartBtn?.addEventListener("click", () => showAuthStep("email"));
-heroJoinBtn?.addEventListener("click", () => showAuthStep("email"));
 continueEmailBtn?.addEventListener("click", () => showAuthStep("email"));
 loginEmailBtn?.addEventListener("click", () => showAuthStep("email"));
-backToWelcomeBtn?.addEventListener("click", () => showAuthStep("welcome"));
+backToWelcomeBtn?.addEventListener("click", () => showAuthStep("email"));
 
 avatarPicker?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-avatar]");
@@ -193,23 +192,20 @@ emailForm?.addEventListener("submit", async (event) => {
 });
 
 nicknameInput?.addEventListener("input", () => {
-  state.nicknameAvailable = false;
   clearTimeout(state.nicknameTimer);
-  const nickname = nicknameInput.value.trim().toLowerCase();
-  nicknameInput.value = nickname;
+  const nickname = nicknameInput.value.trim();
   const localError = validateNicknameText(nickname);
   if (localError) {
     nicknameStatus.textContent = localError;
     nicknameStatus.className = "field-status danger";
     return;
   }
-  nicknameStatus.textContent = "Checking availability...";
-  nicknameStatus.className = "field-status";
+  nicknameStatus.textContent = "This name will show in chat, games, and room members.";
+  nicknameStatus.className = "field-status success";
   renderProfilePreview();
-  state.nicknameTimer = setTimeout(checkNicknameAvailability, 350);
 });
 
-[displayNameInput, statusInput].forEach((input) => {
+[displayNameInput].forEach((input) => {
   input?.addEventListener("input", renderProfilePreview);
 });
 
@@ -220,9 +216,9 @@ profileForm?.addEventListener("submit", async (event) => {
     const data = await api("/api/profile", {
       sessionToken: state.auth?.sessionToken,
       nickname: nicknameInput.value.trim(),
-      displayName: displayNameInput.value.trim(),
+      displayName: nicknameInput.value.trim(),
       avatar: state.selectedAvatar,
-      status: statusInput.value.trim(),
+      status: "Ready",
     });
     state.profile = data.account;
     hydrateHomeProfile();
@@ -420,7 +416,7 @@ function showAuthStep(step) {
   [authWelcome, emailForm, profileForm].forEach((element) => element?.classList.add("hidden"));
   if (step === "email") emailForm.classList.remove("hidden");
   else if (step === "profile") profileForm.classList.remove("hidden");
-  else authWelcome.classList.remove("hidden");
+  else emailForm.classList.remove("hidden");
 }
 
 function showHome() {
@@ -459,7 +455,7 @@ function hydrateHomeProfile() {
   homeNickname.textContent = profile.nickname ? `@${profile.nickname}` : "@profile";
   if (nameInput) nameInput.value = profile.displayName || profile.nickname || "";
   if (emailInput) emailInput.value = profile.email || "";
-  if (vibeInput) vibeInput.value = profile.status || "Ready";
+  if (vibeInput) vibeInput.value = "Ready";
   if (profile.avatar && avatarPicker) {
     state.selectedAvatar = profile.avatar;
     avatarPicker.querySelectorAll("button").forEach((button) => {
@@ -470,12 +466,11 @@ function hydrateHomeProfile() {
 
 function renderProfilePreview() {
   if (!profilePreviewAvatar) return;
-  const nickname = nicknameInput?.value.trim() || "nickname";
-  const displayName = displayNameInput?.value.trim() || "Your display name";
-  const status = statusInput?.value.trim() || "Ready to watch 🎬";
+  const nickname = nicknameInput?.value.trim() || "Your name";
+  const status = "Ready";
   profilePreviewAvatar.textContent = state.selectedAvatar || "🎧";
-  profilePreviewNickname.textContent = `@${nickname}`;
-  profilePreviewName.textContent = displayName;
+  profilePreviewNickname.textContent = nickname;
+  profilePreviewName.textContent = "";
   profilePreviewStatus.textContent = status;
 }
 
@@ -484,7 +479,7 @@ async function restoreAuthSession() {
   if (params.get("room")) roomInput.value = params.get("room");
   const token = localStorage.getItem("watchPartySession");
   if (!token) {
-    showAuthStep("welcome");
+    showAuthStep("email");
     return;
   }
   try {
@@ -494,34 +489,15 @@ async function restoreAuthSession() {
     else showAuthStep("profile");
   } catch {
     localStorage.removeItem("watchPartySession");
-    showAuthStep("welcome");
+    showAuthStep("email");
   }
 }
 
 function validateNicknameText(nickname) {
-  if (nickname.length < 3) return "Nickname must be at least 3 characters.";
-  if (nickname.length > 20) return "Nickname must be 20 characters or less.";
-  if (!/^[a-z0-9_.]+$/.test(nickname)) return "Only letters, numbers, underscore and dot are allowed.";
+  if (nickname.length < 2) return "Name must be at least 2 characters.";
+  if (nickname.length > 24) return "Name must be 24 characters or less.";
+  if (!/^[A-Za-z0-9 ._-]+$/.test(nickname)) return "Use letters, numbers, spaces, dot, underscore, or hyphen.";
   return "";
-}
-
-async function checkNicknameAvailability() {
-  const nickname = nicknameInput.value.trim();
-  const error = validateNicknameText(nickname);
-  if (error) {
-    nicknameStatus.textContent = error;
-    nicknameStatus.className = "field-status danger";
-    return;
-  }
-  try {
-    const data = await apiGet(`/api/nickname/check?nickname=${encodeURIComponent(nickname)}&token=${encodeURIComponent(state.auth?.sessionToken || "")}`);
-    state.nicknameAvailable = Boolean(data.available);
-    nicknameStatus.textContent = data.message || (data.available ? "Nickname available." : "Nickname already taken.");
-    nicknameStatus.className = `field-status ${data.available ? "success" : "danger"}`;
-  } catch (error) {
-    nicknameStatus.textContent = error.message;
-    nicknameStatus.className = "field-status danger";
-  }
 }
 
 async function loadAppConfig() {
@@ -665,11 +641,20 @@ async function pollEvents() {
     const response = await fetch(`/api/events?${query}`);
     if (!response.ok) throw new Error("Disconnected");
     const data = await response.json();
+    if (state.wasDisconnected) {
+      state.wasDisconnected = false;
+      appendSystem("Reconnected. Syncing room state.");
+      playNotice("sync");
+      if (data.snapshot) applySnapshot(data.snapshot, true);
+    }
     state.room = data.snapshot;
     renderRoom(data.snapshot);
     data.events.forEach(handleEvent);
   } catch {
-    appendSystem("Connection paused. Trying again...");
+    if (!state.wasDisconnected) {
+      state.wasDisconnected = true;
+      appendSystem("Connection paused. Trying again...");
+    }
   } finally {
     state.pollTimer = setTimeout(pollEvents, 900);
   }
@@ -677,12 +662,21 @@ async function pollEvents() {
 
 function handleEvent(event) {
   state.lastSeq = Math.max(state.lastSeq, event.seq);
-  if (event.type === "chat") appendChat(event.payload.name, event.payload.text, event.payload.avatar);
-  if (event.type === "system") appendSystem(event.payload.message);
+  if (event.type === "chat") {
+    appendChat(event.payload.name, event.payload.text, event.payload.avatar);
+    playNotice("chat");
+  }
+  if (event.type === "system") {
+    appendSystem(event.payload.message);
+    playNotice("join");
+  }
   if (event.type === "queue") appendSystem(event.payload.message);
   if (event.type === "theme") appendSystem(`${event.payload.emoji} ${event.payload.by} switched to ${event.payload.name}.`);
   if (event.type === "prompt") appendSystem(`Mini game: ${event.payload.text}`);
-  if (event.type === "reaction") burstReaction(event.payload.emoji);
+  if (event.type === "reaction") {
+    burstReaction(event.payload.emoji);
+    playNotice("reaction");
+  }
   if (event.type === "mix") {
     applyRoomMix(event.payload.mix);
     if (event.payload.userId !== state.user.id) appendSystem(`${event.payload.name} tuned the DJ console.`);
@@ -690,6 +684,7 @@ function handleEvent(event) {
   if (event.type === "game") {
     if (event.payload.snapshot) applyGameSnapshot(event.payload.snapshot);
     if (event.payload.message) appendSystem(`Game: ${event.payload.message}`);
+    playGameNotice(event.payload.message || "");
     renderMiniGames();
   }
   if (event.type === "room" && event.payload.snapshot) {
@@ -703,7 +698,49 @@ function handleEvent(event) {
     state.room.position = payload.position;
     state.room.updatedAt = payload.updatedAt;
     applySnapshot(state.room);
+    playNotice(payload.action === "load" ? "load" : "sync");
     if (payload.userId !== state.user.id) appendSystem(`${payload.name} ${describeControl(payload.action)}.`);
+  }
+}
+
+function playGameNotice(message) {
+  const lower = message.toLowerCase();
+  if (lower.includes("won")) playNotice("win");
+  else if (lower.includes("climbed")) playNotice("ladder");
+  else if (lower.includes("slid")) playNotice("snake");
+  else playNotice("dice");
+}
+
+function playNotice(kind) {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const tones = {
+      chat: 520,
+      join: 660,
+      reaction: 780,
+      dice: 440,
+      ladder: 880,
+      snake: 220,
+      win: 990,
+      load: 620,
+      sync: 360,
+    };
+    oscillator.frequency.value = tones[kind] || 480;
+    oscillator.type = kind === "snake" ? "sawtooth" : "sine";
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.045, ctx.currentTime + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.18);
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.start();
+    oscillator.stop(ctx.currentTime + 0.2);
+    setTimeout(() => ctx.close?.(), 260);
+  } catch {
+    // Sound is optional; browsers can block audio before user interaction.
   }
 }
 
@@ -813,14 +850,13 @@ function renderTyping(room) {
 }
 
 function renderMiniGames() {
-  if (state.activeGame === "prompt") state.activeGame = "ludo";
+  state.activeGame = "snakes";
   document.querySelectorAll("[data-game-tab]").forEach((button) => {
     button.classList.toggle("selected", button.dataset.gameTab === state.activeGame);
   });
   promptText?.classList.add("hidden");
-  ludoGame.classList.toggle("hidden", state.activeGame !== "ludo");
-  snakesGame.classList.toggle("hidden", state.activeGame !== "snakes");
-  renderLudo();
+  ludoGame?.classList.add("hidden");
+  snakesGame.classList.remove("hidden");
   renderSnakes();
 }
 
@@ -1130,6 +1166,11 @@ function renderSnakes() {
   syncGameSlots(players);
   const activePlayer = players[state.snakes.turn % players.length];
   const isMyTurn = activePlayer.id === state.user?.id;
+  snakesGame.classList.toggle("your-turn", !state.snakes.winner && isMyTurn);
+  if (turnBadge) {
+    turnBadge.textContent = state.snakes.winner ? `${state.snakes.winner} won` : isMyTurn ? "Your Turn" : `${activePlayer.name}'s turn`;
+    turnBadge.classList.toggle("active", !state.snakes.winner && isMyTurn);
+  }
   snakesDice.textContent = diceFace(state.snakes.lastRoll);
   snakesStatus.textContent = state.snakes.message || "New Snake & Ladder round. First exact 100 wins.";
   if (!state.snakes.winner && !isMyTurn) {
@@ -1164,8 +1205,9 @@ function renderSnakes() {
     .map((player, index) => {
       const { x, y } = snakeCellCenter(state.snakes.positions[index] || 1);
       const offset = (index - 1.5) * 8;
+      const active = activePlayer.id === player.id && !state.snakes.winner;
       return `
-        <g class="svg-token" transform="translate(${x + offset}, ${y + offset})">
+        <g class="svg-token snake-token ${active ? "active" : ""}" transform="translate(${x + offset}, ${y + offset})">
           <circle r="15" fill="${player.color}"></circle>
           <text y="5">${escapeHtml(player.avatar)}</text>
         </g>

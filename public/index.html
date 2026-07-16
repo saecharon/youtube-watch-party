@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>YouTube Watch Party</title>
-    <link rel="stylesheet" href="/styles.css?v=ludo-safe-places-1">
+    <link rel="stylesheet" href="/styles.css?v=release-extra-1">
   </head>
   <body class="theme-party">
     <main class="app-shell">
@@ -31,11 +31,7 @@
             <span>Live emoji chat</span>
             <span>Synced YouTube</span>
           </div>
-          <div class="hero-actions">
-            <button id="heroStartBtn" type="button" class="primary-button">Get Started</button>
-            <button id="heroJoinBtn" type="button" class="secondary-button">Join a Room</button>
-          </div>
-          <p class="trust-line">Free to join • Works on mobile and desktop</p>
+          <p class="trust-line">Private rooms • Stay logged in on this device</p>
           <div class="legal-row">
             <a href="/privacy.html">Privacy Policy</a>
             <a href="/terms.html">Terms and Conditions</a>
@@ -44,7 +40,7 @@
 
         <section class="login-card auth-card">
           <div class="card-glow"></div>
-          <div id="authWelcome" class="auth-step">
+          <div id="authWelcome" class="auth-step hidden">
             <span class="eyebrow">Public test login</span>
             <h2>Continue to your rooms</h2>
             <p class="muted-copy">Email login is open for testing. Enter your email, create your profile, and join a room instantly.</p>
@@ -52,38 +48,31 @@
             <button id="loginEmailBtn" type="button" class="ghost-button">Login for existing users</button>
           </div>
 
-          <form id="emailForm" class="auth-step hidden">
+          <form id="emailForm" class="auth-step">
             <div class="login-card-head">
-              <span class="eyebrow">Public login</span>
-              <h2>Enter your email</h2>
+              <span class="eyebrow">Private app login</span>
+              <h2>Login with email</h2>
             </div>
+            <p class="muted-copy">Use your email to stay logged in on this device. Your email is not shown inside rooms.</p>
             <label>
               Email address
               <input id="authEmailInput" type="email" maxlength="120" placeholder="you@college.edu" autocomplete="email" required>
             </label>
             <button type="submit" class="primary-button">Continue</button>
-            <button id="backToWelcomeBtn" type="button" class="ghost-button">Back</button>
             <p id="emailError" class="error-text" role="alert"></p>
           </form>
 
           <form id="profileForm" class="auth-step hidden">
             <div class="login-card-head">
-              <span class="eyebrow">Profile</span>
-              <h2>Claim your identity</h2>
+              <span class="eyebrow">Room profile</span>
+              <h2>Choose your chat name</h2>
             </div>
             <label>
-              Unique nickname
-              <input id="nicknameInput" maxlength="20" placeholder="sai.music" autocomplete="nickname" required>
+              Chat name
+              <input id="nicknameInput" maxlength="24" placeholder="Your name" autocomplete="nickname" required>
             </label>
-            <p id="nicknameStatus" class="field-status">Use lowercase letters, numbers, underscore, or dot.</p>
-            <label>
-              Display name
-              <input id="displayNameInput" maxlength="32" placeholder="Sai Charan" autocomplete="name">
-            </label>
-            <label>
-              Mood or status
-              <input id="statusInput" maxlength="60" placeholder="Ready for music">
-            </label>
+            <p id="nicknameStatus" class="field-status">This is the only name shown in rooms.</p>
+            <input id="displayNameInput" class="hidden" aria-hidden="true" tabindex="-1">
             <fieldset class="avatar-field">
               <legend>Pick your avatar</legend>
               <div id="avatarPicker" class="avatar-picker">
@@ -95,14 +84,6 @@
                 <button type="button" data-avatar="💃">💃</button>
               </div>
             </fieldset>
-            <div class="profile-preview-card">
-              <span id="profilePreviewAvatar">🎧</span>
-              <div>
-                <strong id="profilePreviewNickname">@nickname</strong>
-                <p id="profilePreviewName">Your display name</p>
-                <small id="profilePreviewStatus">Ready to watch 🎬</small>
-              </div>
-            </div>
             <button type="submit" class="primary-button">Save profile</button>
             <p id="profileError" class="error-text" role="alert"></p>
           </form>
@@ -290,12 +271,11 @@
                   <h3>Play with room members</h3>
                 </div>
               </div>
-              <div class="game-tabs" aria-label="Mini game selector">
-                <button type="button" data-game-tab="ludo">Ludo</button>
+              <div class="game-tabs hidden" aria-label="Mini game selector">
                 <button type="button" data-game-tab="snakes">Snake & Ladder</button>
               </div>
               <p id="promptText" class="hidden"></p>
-              <div id="ludoGame" class="mini-game">
+              <div id="ludoGame" class="mini-game hidden" aria-hidden="true">
                 <div class="game-head">
                   <strong>Ludo</strong>
                   <span id="ludoStatus">Roll dice. First player to bring all 4 pawns HOME wins.</span>
@@ -311,7 +291,7 @@
                   <button id="ludoResetBtn" class="ghost-button" type="button">Reset</button>
                 </div>
               </div>
-              <div id="snakesGame" class="mini-game hidden">
+              <div id="snakesGame" class="mini-game">
                 <div class="game-head">
                   <strong>Snake & Ladder</strong>
                   <span id="snakesStatus">Roll dice. Reach 100 to win.</span>
@@ -326,6 +306,7 @@
                   <button id="snakesRollBtn" class="secondary-button" type="button">Roll Snake dice</button>
                   <button id="snakesResetBtn" class="ghost-button" type="button">Reset</button>
                 </div>
+                <div id="turnBadge" class="turn-badge">Waiting for turn</div>
               </div>
             </section>
           </div>
@@ -392,6 +373,6 @@
     </main>
 
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script src="/app.js?v=ludo-safe-places-1"></script>
+    <script src="/app.js?v=release-extra-1"></script>
   </body>
 </html>
