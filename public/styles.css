@@ -1587,6 +1587,15 @@ input:focus {
   background: linear-gradient(135deg, rgba(0, 212, 255, 0.18), rgba(124, 255, 178, 0.13));
 }
 
+.game-action .ghost-button {
+  justify-self: end;
+  min-height: 34px;
+  border-radius: 8px;
+  padding: 0 10px;
+  font-size: 0.76rem;
+  opacity: 0.74;
+}
+
 .ludo-track,
 .snakes-board {
   position: relative;
@@ -1764,6 +1773,36 @@ input:focus {
 .snake-svg-tile.ladder rect {
   fill: #ffe45f;
   stroke: rgba(124, 78, 12, 0.42);
+}
+
+.ludo-svg-tile.safe text {
+  fill: #8a5b00;
+  font-size: 18px;
+  stroke-width: 1px;
+}
+
+.ludo-svg-tile.start rect {
+  stroke-width: 3.2;
+}
+
+.ludo-svg-tile.start.green rect {
+  fill: #dff8e9;
+  stroke: #16b75f;
+}
+
+.ludo-svg-tile.start.red rect {
+  fill: #ffe1e4;
+  stroke: #e7333f;
+}
+
+.ludo-svg-tile.start.blue rect {
+  fill: #dceeff;
+  stroke: #1d8dff;
+}
+
+.ludo-svg-tile.start.yellow rect {
+  fill: #fff1b8;
+  stroke: #ffc928;
 }
 
 .ludo-svg-tile.finish rect,
@@ -2175,7 +2214,9 @@ button:disabled {
   }
 
   .game-action .ghost-button {
-    grid-column: 1 / -1;
+    grid-column: 2;
+    justify-self: end;
+    width: auto;
   }
 
   .ludo-track,
@@ -2411,6 +2452,12 @@ body::before {
 
 .game-action button {
   min-height: 44px;
+}
+
+.game-action .ghost-button {
+  min-height: 30px;
+  padding: 0 8px;
+  font-size: 0.72rem;
 }
 
 .ludo-track,

@@ -38,8 +38,8 @@ SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000
 RATE_WINDOW_MS = 60 * 1000
 OTP_REQUEST_LIMIT = 3
 OTP_VERIFY_LIMIT = 8
-LUDO_SAFE_TILES = {0, 8, 14, 22, 28, 36, 42, 50}
-LUDO_START_OFFSETS = [0, 14, 28, 42]
+LUDO_SAFE_TILES = {0, 8, 13, 21, 26, 34, 39, 47}
+LUDO_START_OFFSETS = [0, 13, 26, 39]
 
 THEMES = {
     "late-night": {"name": "Late Night", "emoji": "🌙"},
@@ -526,7 +526,7 @@ def search_youtube(query: str) -> list[dict]:
 
 
 def ludo_board_index(player_index: int, progress: int) -> int:
-    return (progress + LUDO_START_OFFSETS[player_index]) % 56
+    return (progress + LUDO_START_OFFSETS[player_index]) % 52
 
 
 def ludo_landing_captures(pawns: list[list[int]], player_index: int, landing_progress: int) -> int:

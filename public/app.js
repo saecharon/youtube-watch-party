@@ -115,6 +115,10 @@ const themeNames = {
   anime: "✨ Anime",
 };
 
+const LUDO_SAFE_TILES = [0, 8, 13, 21, 26, 34, 39, 47];
+const LUDO_START_OFFSETS = [0, 13, 26, 39];
+const LUDO_PLAYER_COLORS = ["green", "red", "blue", "yellow"];
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -400,10 +404,12 @@ snakesRollBtn.addEventListener("click", async () => {
 });
 
 ludoResetBtn.addEventListener("click", async () => {
+  if (!confirm("Reset this Ludo round?")) return;
   await resetRoomGame("ludo", ludoStatus);
 });
 
 snakesResetBtn.addEventListener("click", async () => {
+  if (!confirm("Reset this Snake & Ladder round?")) return;
   await resetRoomGame("snakes", snakesStatus);
 });
 
@@ -955,9 +961,8 @@ function chooseLudoMove(candidates) {
 
 function ludoLandingCaptures(playerIndex, landingProgress) {
   if (landingProgress < 0 || landingProgress >= 52) return 0;
-  const safe = new Set([0, 8, 14, 22, 28, 36, 42, 50]);
   const landing = ludoBoardIndex(playerIndex, landingProgress);
-  if (safe.has(landing)) return 0;
+  if (LUDO_SAFE_TILES.includes(landing)) return 0;
   return state.ludo.pawns.reduce((total, pawns, rivalIndex) => {
     if (rivalIndex === playerIndex) return total;
     return total + pawns.filter((position) => position >= 0 && position < 52 && ludoBoardIndex(rivalIndex, position) === landing).length;
@@ -965,11 +970,10 @@ function ludoLandingCaptures(playerIndex, landingProgress) {
 }
 
 function captureLudoRival(playerIndex, pawnIndex) {
-  const safe = new Set([0, 8, 14, 22, 28, 36, 42, 50]);
   const progress = state.ludo.pawns[playerIndex][pawnIndex];
   if (progress < 0 || progress >= 52) return "";
   const landing = ludoBoardIndex(playerIndex, progress);
-  if (safe.has(landing)) return "";
+  if (LUDO_SAFE_TILES.includes(landing)) return "";
   const players = gamePlayers();
   for (let rivalIndex = 0; rivalIndex < state.ludo.pawns.length; rivalIndex += 1) {
     if (rivalIndex === playerIndex) continue;
@@ -986,8 +990,7 @@ function captureLudoRival(playerIndex, pawnIndex) {
 }
 
 function ludoBoardIndex(playerIndex, progress) {
-  const startOffsets = [0, 14, 28, 42];
-  return (progress + startOffsets[playerIndex]) % 56;
+  return (progress + LUDO_START_OFFSETS[playerIndex]) % 52;
 }
 
 function ludoPawnPoint(playerIndex, pawnIndex, progress, path) {
@@ -1075,11 +1078,15 @@ function renderLudo() {
     .join("");
   const pathTiles = path
     .map(([x, y], index) => {
-      const isSafe = [0, 8, 14, 22, 28, 36, 42, 50].includes(index);
+      const startIndex = LUDO_START_OFFSETS.indexOf(index);
+      const isStart = startIndex >= 0;
+      const isSafe = LUDO_SAFE_TILES.includes(index);
+      const colorClass = isStart ? LUDO_PLAYER_COLORS[startIndex] : "";
+      const marker = isStart ? "●" : isSafe ? "★" : "";
       return `
-        <g class="ludo-svg-tile ${isSafe ? "safe" : ""}">
+        <g class="ludo-svg-tile ${isSafe ? "safe" : ""} ${isStart ? `start ${colorClass}` : ""}">
           <rect x="${x - 20}" y="${y - 20}" width="40" height="40" rx="5"></rect>
-          <text x="${x}" y="${y + 5}">${isSafe ? "★" : ""}</text>
+          <text x="${x}" y="${y + 5}">${marker}</text>
         </g>
       `;
     })
@@ -1268,10 +1275,10 @@ function ludoLane(startX, startY, count, color, direction = "y") {
 
 function ludoPathPoints() {
   const cells = [
-    [6, 14], [6, 13], [6, 12], [6, 11], [6, 10], [6, 9], [5, 8], [4, 8], [3, 8], [2, 8], [1, 8], [0, 8], [0, 7], [0, 6],
+    [6, 13], [6, 12], [6, 11], [6, 10], [6, 9], [5, 8], [4, 8], [3, 8], [2, 8], [1, 8], [0, 8], [0, 7], [0, 6],
     [1, 6], [2, 6], [3, 6], [4, 6], [5, 6], [6, 5], [6, 4], [6, 3], [6, 2], [6, 1], [6, 0], [7, 0], [8, 0], [8, 1],
     [8, 2], [8, 3], [8, 4], [8, 5], [9, 6], [10, 6], [11, 6], [12, 6], [13, 6], [14, 6], [14, 7], [14, 8], [13, 8], [12, 8],
-    [11, 8], [10, 8], [9, 8], [8, 9], [8, 10], [8, 11], [8, 12], [8, 13], [8, 14], [7, 14], [6, 14], [6, 13], [6, 12], [6, 11],
+    [11, 8], [10, 8], [9, 8], [8, 9], [8, 10], [8, 11], [8, 12], [8, 13], [8, 14], [7, 14], [6, 14],
   ];
   return cells.map(([x, y]) => [x * 40 + 20, y * 40 + 20]);
 }
