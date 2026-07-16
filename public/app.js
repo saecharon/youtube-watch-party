@@ -20,6 +20,9 @@ const state = {
   profile: null,
   nicknameTimer: null,
   nicknameAvailable: false,
+  pendingImage: null,
+  speechRecognition: null,
+  listening: false,
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -95,6 +98,10 @@ const historyList = $("#historyList");
 const chatLog = $("#chatLog");
 const chatForm = $("#chatForm");
 const chatInput = $("#chatInput");
+const photoInput = $("#photoInput");
+const attachPhotoBtn = $("#attachPhotoBtn");
+const micBtn = $("#micBtn");
+const attachmentPreview = $("#attachmentPreview");
 const typingText = $("#typingText");
 const playerOverlay = $("#playerOverlay");
 const reactionLayer = $("#reactionLayer");
@@ -332,9 +339,11 @@ chatInput.addEventListener("input", () => {
 chatForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const text = chatInput.value.trim();
-  if (!text) return;
+  if (!text && !state.pendingImage) return;
   chatInput.value = "";
-  await api("/api/chat", { ...authBody(), text });
+  const image = state.pendingImage;
+  clearAttachmentPreview();
+  await api("/api/chat", { ...authBody(), text, image });
 });
 
 document.querySelectorAll("[data-mood]").forEach((button) => {
@@ -346,6 +355,39 @@ document.querySelectorAll("[data-emoji]").forEach((button) => {
     chatInput.value = `${chatInput.value}${button.dataset.emoji}`;
     chatInput.focus();
   });
+});
+
+attachPhotoBtn?.addEventListener("click", () => {
+  photoInput?.click();
+});
+
+photoInput?.addEventListener("change", async () => {
+  const file = photoInput.files?.[0];
+  photoInput.value = "";
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    appendSystem("Only photos/images can be attached. PDFs and files are blocked.");
+    return;
+  }
+  if (file.size > 2_500_000) {
+    appendSystem("Photo is too large. Please choose an image under 2.5 MB.");
+    return;
+  }
+  try {
+    const dataUrl = await fileToDataUrl(file);
+    state.pendingImage = {
+      name: file.name.slice(0, 80),
+      type: file.type,
+      data: dataUrl,
+    };
+    renderAttachmentPreview();
+  } catch {
+    appendSystem("Could not attach that image. Try another photo.");
+  }
+});
+
+micBtn?.addEventListener("click", () => {
+  toggleSpeechInput();
 });
 
 document.querySelectorAll("[data-reaction]").forEach((button) => {
@@ -646,7 +688,7 @@ async function pollEvents() {
 function handleEvent(event) {
   state.lastSeq = Math.max(state.lastSeq, event.seq);
   if (event.type === "chat") {
-    appendChat(event.payload.name, event.payload.text, event.payload.avatar);
+    appendChat(event.payload.name, event.payload.text, event.payload.avatar, event.payload.image);
     playNotice("chat");
   }
   if (event.type === "system") {
@@ -1269,13 +1311,100 @@ function burstReaction(emoji) {
   setTimeout(() => item.remove(), 1600);
 }
 
-function appendChat(name, text, avatar = "🎧") {
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderAttachmentPreview() {
+  if (!attachmentPreview || !state.pendingImage) return;
+  attachmentPreview.classList.remove("hidden");
+  attachmentPreview.innerHTML = `
+    <img alt="Selected chat attachment">
+    <div>
+      <strong>Photo ready</strong>
+      <span></span>
+    </div>
+    <button type="button" aria-label="Remove attached photo">Remove</button>
+  `;
+  attachmentPreview.querySelector("img").src = state.pendingImage.data;
+  attachmentPreview.querySelector("span").textContent = state.pendingImage.name || "Image attachment";
+  attachmentPreview.querySelector("button").addEventListener("click", clearAttachmentPreview);
+}
+
+function clearAttachmentPreview() {
+  state.pendingImage = null;
+  if (!attachmentPreview) return;
+  attachmentPreview.classList.add("hidden");
+  attachmentPreview.innerHTML = "";
+}
+
+function toggleSpeechInput() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    appendSystem("Mic typing is not supported in this browser. Try Chrome or Android browser.");
+    return;
+  }
+  if (state.speechRecognition && state.listening) {
+    state.speechRecognition.stop();
+    return;
+  }
+  const recognition = new SpeechRecognition();
+  recognition.lang = navigator.language || "en-IN";
+  recognition.interimResults = true;
+  recognition.continuous = false;
+  state.speechRecognition = recognition;
+  state.listening = true;
+  micBtn?.classList.add("listening");
+  micBtn?.setAttribute("aria-label", "Stop listening");
+  recognition.onresult = (event) => {
+    const transcript = Array.from(event.results)
+      .map((result) => result[0]?.transcript || "")
+      .join(" ")
+      .trim();
+    if (transcript) chatInput.value = transcript.slice(0, 400);
+  };
+  recognition.onerror = () => {
+    appendSystem("Mic could not hear clearly. Tap mic and try again.");
+  };
+  recognition.onend = () => {
+    state.listening = false;
+    micBtn?.classList.remove("listening");
+    micBtn?.setAttribute("aria-label", "Speak message");
+    chatInput.focus();
+  };
+  try {
+    recognition.start();
+  } catch {
+    state.listening = false;
+    micBtn?.classList.remove("listening");
+    appendSystem("Mic permission was not available. Allow microphone access and try again.");
+  }
+}
+
+function appendChat(name, text, avatar = "🎧", image = null) {
   const item = document.createElement("div");
   item.className = "chat-message";
   item.innerHTML = `<span class="chat-avatar"></span><div><strong></strong><span class="chat-text"></span></div>`;
   item.querySelector(".chat-avatar").textContent = avatar;
   item.querySelector("strong").textContent = name;
   item.querySelector(".chat-text").textContent = text;
+  if (image?.data) {
+    const link = document.createElement("a");
+    link.href = image.data;
+    link.target = "_blank";
+    link.rel = "noreferrer";
+    link.className = "chat-image-link";
+    const img = document.createElement("img");
+    img.src = image.data;
+    img.alt = image.name || "Chat photo";
+    link.appendChild(img);
+    item.querySelector("div").appendChild(link);
+  }
   chatLog.appendChild(item);
   chatLog.scrollTop = chatLog.scrollHeight;
 }

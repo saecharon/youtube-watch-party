@@ -38,6 +38,7 @@ SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000
 RATE_WINDOW_MS = 60 * 1000
 OTP_REQUEST_LIMIT = 3
 OTP_VERIFY_LIMIT = 8
+MAX_CHAT_IMAGE_CHARS = 3_400_000
 
 THEMES = {
     "late-night": {"name": "Late Night", "emoji": "🌙"},
@@ -849,7 +850,20 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
 
     def handle_chat(self, room_id: str, user_id: str, data: dict) -> None:
         text = str(data.get("text", "")).strip()[:400]
-        if not text:
+        image = data.get("image")
+        image_payload = None
+        if isinstance(image, dict):
+            image_type = str(image.get("type", ""))[:80]
+            image_data = str(image.get("data", ""))
+            image_name = str(image.get("name", "Photo"))[:80]
+            if not image_type.startswith("image/") or not image_data.startswith(f"data:{image_type};base64,"):
+                self.json_response({"error": "Only photo/image attachments are allowed."}, HTTPStatus.BAD_REQUEST)
+                return
+            if len(image_data) > MAX_CHAT_IMAGE_CHARS:
+                self.json_response({"error": "Photo is too large. Please use a smaller image."}, HTTPStatus.BAD_REQUEST)
+                return
+            image_payload = {"type": image_type, "name": image_name, "data": image_data}
+        if not text and not image_payload:
             self.json_response({"error": "Message is empty"}, HTTPStatus.BAD_REQUEST)
             return
         with lock:
@@ -859,7 +873,7 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
             if user["stats"]["chats"] >= 5:
                 award_badges(user, "Chat Star")
             room.get("typing", {}).pop(user_id, None)
-            make_event(room, "chat", {"userId": user_id, "name": user["name"], "avatar": user.get("avatar", "🎧"), "text": text})
+            make_event(room, "chat", {"userId": user_id, "name": user["name"], "avatar": user.get("avatar", "🎧"), "text": text, "image": image_payload})
             make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
         self.json_response({"ok": True})
 

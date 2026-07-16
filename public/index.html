@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>YouTube Watch Party</title>
-    <link rel="stylesheet" href="/styles.css?v=snake-only-1">
+    <link rel="stylesheet" href="/styles.css?v=chat-media-1">
   </head>
   <body class="theme-party">
     <main class="app-shell">
@@ -340,8 +340,12 @@
               </div>
               <form id="chatForm" class="chat-form">
                 <input id="chatInput" maxlength="400" placeholder="Type a message or add emoji..." aria-label="Chat message">
+                <input id="photoInput" class="hidden" type="file" accept="image/*" aria-label="Attach photo">
+                <button id="attachPhotoBtn" type="button" class="chat-tool-button" title="Attach photo" aria-label="Attach photo">＋</button>
+                <button id="micBtn" type="button" class="chat-tool-button" title="Speak message" aria-label="Speak message">🎙</button>
                 <button type="submit" class="primary-button">Send</button>
               </form>
+              <div id="attachmentPreview" class="attachment-preview hidden"></div>
             </div>
           </aside>
         </section>
@@ -354,6 +358,6 @@
     </main>
 
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script src="/app.js?v=snake-only-1"></script>
+    <script src="/app.js?v=chat-media-1"></script>
   </body>
 </html>
