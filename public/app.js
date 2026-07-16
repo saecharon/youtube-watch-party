@@ -12,7 +12,19 @@ const state = {
   selectedAvatar: "🎧",
   lastTypingAt: 0,
   activeGame: "ludo",
-  ludo: { turn: 0, pawns: Array.from({ length: 4 }, () => [-1, -1, -1, -1]), winner: null, lastRoll: null, message: "New Ludo round. Roll a 6 to open a pawn." },
+  ludo: {
+    status: "waiting",
+    players: [],
+    colors: ["red"],
+    ready: {},
+    turn: 0,
+    turnNumber: 1,
+    pawns: Array.from({ length: 4 }, () => [-1, -1, -1, -1]),
+    pendingRoll: null,
+    winner: null,
+    lastRoll: null,
+    message: "Press Ready. Host starts Ludo when 2-4 players are ready.",
+  },
   snakes: { turn: 0, positions: [1, 1, 1, 1], winner: null, lastRoll: null },
   mix: { bass: 40, volume: 85 },
   mixSyncTimer: null,
@@ -95,6 +107,9 @@ const ludoDice = $("#ludoDice");
 const ludoRollBtn = $("#ludoRollBtn");
 const ludoResetBtn = $("#ludoResetBtn");
 const ludoTurnBadge = $("#ludoTurnBadge");
+const ludoReadyBtn = $("#ludoReadyBtn");
+const ludoStartBtn = $("#ludoStartBtn");
+const ludoReadyText = $("#ludoReadyText");
 const snakesGame = $("#snakesGame");
 const snakesBoard = $("#snakesBoard");
 const snakesStatus = $("#snakesStatus");
@@ -114,6 +129,7 @@ const typingText = $("#typingText");
 const playerOverlay = $("#playerOverlay");
 const reactionLayer = $("#reactionLayer");
 const subscribeLink = $("#subscribeLink");
+const toastDock = $("#toastDock");
 
 const themeNames = {
   "late-night": "🌙 Late Night",
@@ -324,9 +340,13 @@ copyLinkBtn.addEventListener("click", async () => {
 });
 
 claimHostBtn.addEventListener("click", async () => {
-  const data = await api("/api/host/claim", authBody());
-  state.room = data.room;
-  renderRoom(data.room);
+  try {
+    const data = await api("/api/host/claim", authBody());
+    state.room = data.room;
+    renderRoom(data.room);
+  } catch (error) {
+    appendSystem(error.message);
+  }
 });
 
 leaveBtn.addEventListener("click", async () => {
@@ -436,6 +456,14 @@ snakesRollBtn.addEventListener("click", async () => {
 
 ludoRollBtn.addEventListener("click", async () => {
   await rollRoomGame("ludo", ludoStatus);
+});
+
+ludoReadyBtn?.addEventListener("click", async () => {
+  await ludoReady();
+});
+
+ludoStartBtn?.addEventListener("click", async () => {
+  await ludoStart();
 });
 
 snakesResetBtn.addEventListener("click", async () => {
@@ -664,6 +692,16 @@ async function voteQueueItem(itemId) {
   renderRoom(data.room);
 }
 
+async function removeQueueItem(itemId) {
+  try {
+    const data = await api("/api/queue/remove", { ...authBody(), itemId });
+    state.room = data.room;
+    renderRoom(data.room);
+  } catch (error) {
+    appendSystem(error.message);
+  }
+}
+
 async function playQueueItem(itemId) {
   const data = await api("/api/queue/play", { ...authBody(), itemId });
   state.room = data.room;
@@ -706,10 +744,14 @@ function handleEvent(event) {
   state.lastSeq = Math.max(state.lastSeq, event.seq);
   if (event.type === "chat") {
     appendChat(event.payload.name, event.payload.text, event.payload.avatar, event.payload.image);
+    if (event.payload.name && event.payload.userId !== state.user?.id) {
+      showToast(`${event.payload.avatar || "💬"} ${event.payload.name}`, event.payload.text || "sent a photo", "chat");
+    }
     playNotice("chat");
   }
   if (event.type === "system") {
     appendSystem(event.payload.message);
+    showToast("Room update", event.payload.message, "system");
     playNotice("join");
   }
   if (event.type === "queue") appendSystem(event.payload.message);
@@ -757,10 +799,9 @@ function playNotice(kind) {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) return;
     const ctx = new AudioContextClass();
-    const oscillator = ctx.createOscillator();
     const gain = ctx.createGain();
     const tones = {
-      chat: 520,
+      chat: 740,
       join: 660,
       reaction: 780,
       dice: 440,
@@ -770,19 +811,38 @@ function playNotice(kind) {
       load: 620,
       sync: 360,
     };
-    oscillator.frequency.value = tones[kind] || 480;
-    oscillator.type = kind === "snake" ? "sawtooth" : "sine";
+    const secondTone = kind === "chat" ? 930 : 0;
     gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.045, ctx.currentTime + 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.18);
-    oscillator.connect(gain);
+    gain.gain.exponentialRampToValueAtTime(kind === "chat" ? 0.032 : 0.045, ctx.currentTime + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + (kind === "chat" ? 0.11 : 0.18));
     gain.connect(ctx.destination);
-    oscillator.start();
-    oscillator.stop(ctx.currentTime + 0.2);
-    setTimeout(() => ctx.close?.(), 260);
+    [tones[kind] || 480, secondTone].filter(Boolean).forEach((frequency, index) => {
+      const oscillator = ctx.createOscillator();
+      oscillator.frequency.value = frequency;
+      oscillator.type = kind === "snake" ? "sawtooth" : "sine";
+      oscillator.connect(gain);
+      oscillator.start(ctx.currentTime + index * 0.075);
+      oscillator.stop(ctx.currentTime + index * 0.075 + 0.12);
+    });
+    setTimeout(() => ctx.close?.(), 320);
   } catch {
     // Sound is optional; browsers can block audio before user interaction.
   }
+}
+
+function showToast(title, message, kind = "system") {
+  if (!toastDock) return;
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${kind}`;
+  toast.innerHTML = `<strong></strong><span></span>`;
+  toast.querySelector("strong").textContent = title;
+  toast.querySelector("span").textContent = String(message || "").slice(0, 90);
+  toastDock.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add("visible"));
+  setTimeout(() => {
+    toast.classList.remove("visible");
+    setTimeout(() => toast.remove(), 260);
+  }, 3200);
 }
 
 function renderRoom(room) {
@@ -791,6 +851,11 @@ function renderRoom(room) {
   peopleCount.textContent = `${room.users.length}/5`;
   const host = room.users.find((user) => user.id === room.hostId);
   roomMeta.textContent = `${themeNames[room.theme] || "🔥 Party"} · Host: ${host?.name || "Open"}`;
+  if (claimHostBtn) {
+    const isHost = room.hostId === state.user?.id;
+    claimHostBtn.textContent = !room.hostId ? "Become host" : isHost ? "You are host" : "Host locked";
+    claimHostBtn.disabled = Boolean(room.hostId && !isHost);
+  }
   document.body.className = `theme-${room.theme || "party"}`;
   renderThemes(room.theme);
   renderPeople(room);
@@ -812,6 +877,7 @@ function renderThemes(activeTheme) {
 
 function renderPeople(room) {
   peopleList.innerHTML = "";
+  const currentUserIsHost = room.hostId === state.user?.id;
   room.users.forEach((user) => {
     const person = document.createElement("div");
     person.className = "person-pill";
@@ -822,12 +888,28 @@ function renderPeople(room) {
       <span class="person-name"></span>
       <span class="person-vibe"></span>
       <div class="badge-row">${badges}</div>
+      <button type="button" class="host-transfer-btn hidden">Make host</button>
     `;
     person.querySelector(".person-avatar").textContent = user.avatar || "🎧";
     person.querySelector(".person-name").textContent = `${user.id === room.hostId ? "Host · " : ""}${label}`;
     person.querySelector(".person-vibe").textContent = `${user.online ? "online" : "away"} · ${user.vibe || "Ready"}`;
+    const transferBtn = person.querySelector(".host-transfer-btn");
+    if (currentUserIsHost && user.id !== state.user?.id) {
+      transferBtn.classList.remove("hidden");
+      transferBtn.addEventListener("click", () => transferHost(user.id));
+    }
     peopleList.appendChild(person);
   });
+}
+
+async function transferHost(targetUserId) {
+  try {
+    const data = await api("/api/host/transfer", { ...authBody(), targetUserId });
+    state.room = data.room;
+    renderRoom(data.room);
+  } catch (error) {
+    appendSystem(error.message);
+  }
 }
 
 function renderQueue(room) {
@@ -852,6 +934,7 @@ function renderQueue(room) {
       <div class="queue-actions">
         <button type="button" class="secondary-button vote-btn">Vote</button>
         <button type="button" class="primary-button play-queue-btn">Play</button>
+        <button type="button" class="ghost-button remove-queue-btn">Remove</button>
       </div>
     `;
     row.querySelector("img").src = item.thumbnail || `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`;
@@ -861,6 +944,10 @@ function renderQueue(room) {
     voteBtn.classList.toggle("selected", (item.voterIds || []).includes(state.user?.id));
     voteBtn.addEventListener("click", () => voteQueueItem(item.id));
     row.querySelector(".play-queue-btn").addEventListener("click", () => playQueueItem(item.id));
+    const removeBtn = row.querySelector(".remove-queue-btn");
+    const canRemove = item.addedById === state.user?.id || room.hostId === state.user?.id;
+    removeBtn.classList.toggle("hidden", !canRemove);
+    removeBtn.addEventListener("click", () => removeQueueItem(item.id));
     queueList.appendChild(row);
   });
 }
@@ -922,6 +1009,36 @@ async function resetRoomGame(game, statusElement) {
   }
 }
 
+async function ludoReady() {
+  try {
+    const data = await api("/api/game/ready", authBody());
+    state.room = data.room;
+    renderRoom(data.room);
+  } catch (error) {
+    ludoStatus.textContent = error.message;
+  }
+}
+
+async function ludoStart() {
+  try {
+    const data = await api("/api/game/start", authBody());
+    state.room = data.room;
+    renderRoom(data.room);
+  } catch (error) {
+    ludoStatus.textContent = error.message;
+  }
+}
+
+async function moveLudoPawn(pawnIndex) {
+  try {
+    const data = await api("/api/game/move", { ...authBody(), pawnIndex });
+    state.room = data.room;
+    renderRoom(data.room);
+  } catch (error) {
+    ludoStatus.textContent = error.message;
+  }
+}
+
 function gamePlayers() {
   const roomUsers = state.room?.users || [];
   let users = roomUsers.filter((user) => user.online !== false);
@@ -939,15 +1056,39 @@ function gamePlayers() {
   }));
 }
 
+function ludoPlayers() {
+  const roomUsers = state.room?.users || [];
+  const byId = new Map(roomUsers.map((user) => [user.id, user]));
+  const ids = Array.isArray(state.ludo.players) && state.ludo.players.length ? state.ludo.players : gamePlayers().map((player) => player.id);
+  return ids.slice(0, 4).map((id, index) => {
+    const user = byId.get(id) || gamePlayers()[index] || {};
+    const colorName = state.ludo.colors?.[index] || ["red", "green", "yellow", "blue"][index];
+    return {
+      id: user.id || id || "",
+      name: user.name || `Player ${index + 1}`,
+      avatar: user.avatar || ["🎧", "🔥", "✨", "🍿"][index],
+      colorName,
+      color: LUDO_COLOR_HEX[colorName] || "#e7333f",
+    };
+  });
+}
+
 function applyGameSnapshot(games) {
   if (!games) return;
   if (games.ludo) {
+    const ludoCount = Array.isArray(games.ludo.players) && games.ludo.players.length ? games.ludo.players.length : gamePlayers().length;
     state.ludo = {
+      status: games.ludo.status || "waiting",
+      players: Array.isArray(games.ludo.players) ? games.ludo.players : [],
+      colors: Array.isArray(games.ludo.colors) ? games.ludo.colors : ["red"],
+      ready: games.ludo.ready || {},
       turn: Number(games.ludo.turn || 0),
-      pawns: normalizeLudoPawns(games.ludo.pawns, gamePlayers().length),
+      turnNumber: Number(games.ludo.turnNumber || 1),
+      pawns: normalizeLudoPawns(games.ludo.pawns, ludoCount),
+      pendingRoll: games.ludo.pendingRoll || null,
       winner: games.ludo.winner || null,
       lastRoll: games.ludo.lastRoll || null,
-      message: games.ludo.message || state.ludo.message || "New Ludo round. Roll a 6 to open a pawn.",
+      message: games.ludo.message || state.ludo.message || "Press Ready. Host starts Ludo when 2-4 players are ready.",
     };
   }
   if (games.snakes) {
@@ -1011,33 +1152,58 @@ function playSnakesTurn(playerIndex, roll, players) {
 }
 
 const LUDO_SAFE_TILES = [0, 8, 13, 21, 26, 34, 39, 47];
-const LUDO_START_OFFSETS = [0, 13, 26, 39];
-const LUDO_COLORS = ["#16b75f", "#e7333f", "#1d8dff", "#ffc928"];
+const LUDO_COLOR_STARTS = { red: 13, green: 0, yellow: 39, blue: 26 };
+const LUDO_COLOR_HEX = { red: "#e7333f", green: "#16b75f", yellow: "#ffc928", blue: "#1d8dff" };
+const LUDO_HOME_INDEX = { red: 0, blue: 1, yellow: 2, green: 3 };
 function renderLudo() {
   if (!ludoGame || !ludoBoard) return;
-  const players = gamePlayers();
-  syncGameSlots(players);
-  const activePlayer = players[state.ludo.turn % players.length];
+  const players = ludoPlayers();
+  state.ludo.pawns = normalizeLudoPawns(state.ludo.pawns, players.length);
+  state.ludo.turn %= Math.max(1, players.length);
+  const activePlayer = players[state.ludo.turn % players.length] || players[0];
   const isMyTurn = activePlayer.id === state.user?.id;
-  ludoGame.classList.toggle("your-turn", !state.ludo.winner && isMyTurn);
+  const isHost = state.room?.hostId === state.user?.id;
+  const pending = state.ludo.pendingRoll;
+  const movable = new Set(pending?.playerId === state.user?.id ? pending.movable || [] : []);
+  const readyCount = Object.values(state.ludo.ready || {}).filter(Boolean).length;
+  const canStart = isHost && state.ludo.status === "waiting" && players.length >= 2;
+  ludoGame.classList.toggle("your-turn", state.ludo.status === "active" && !state.ludo.winner && isMyTurn);
   ludoDice.textContent = diceFace(state.ludo.lastRoll);
-  ludoStatus.textContent = state.ludo.message || "New Ludo round. Roll a 6 to open a pawn.";
-  if (!state.ludo.winner && !isMyTurn) {
+  ludoStatus.textContent = state.ludo.message || "Press Ready. Host starts Ludo when 2-4 players are ready.";
+  if (state.ludo.status === "active" && !state.ludo.winner && !isMyTurn) {
     ludoStatus.textContent = `${ludoStatus.textContent} Turn: ${activePlayer.name}.`;
   }
-  ludoTurnBadge.textContent = state.ludo.winner ? `${state.ludo.winner} won` : isMyTurn ? "Your Turn" : `${activePlayer.name}'s turn`;
-  ludoTurnBadge.classList.toggle("active", !state.ludo.winner && isMyTurn);
-  ludoRollBtn.textContent = state.ludo.winner ? "Round finished" : "Your turn: Roll dice";
-  ludoRollBtn.disabled = Boolean(state.ludo.winner) || !isMyTurn;
-  ludoRollBtn.classList.toggle("hidden", !state.ludo.winner && !isMyTurn);
+  ludoTurnBadge.textContent =
+    state.ludo.status === "waiting"
+      ? "Ready lobby"
+      : state.ludo.winner
+        ? `${state.ludo.winner} won`
+        : pending?.playerId === state.user?.id
+          ? "Tap a glowing pawn"
+          : isMyTurn
+            ? "Your Turn"
+            : `${activePlayer.name}'s turn`;
+  ludoTurnBadge.classList.toggle("active", state.ludo.status === "active" && !state.ludo.winner && (isMyTurn || pending?.playerId === state.user?.id));
+  if (ludoReadyText) ludoReadyText.textContent = `${readyCount}/${players.length} ready · ${players.map((player) => player.colorName).join(", ")}`;
+  if (ludoReadyBtn) {
+    ludoReadyBtn.disabled = state.ludo.status !== "waiting" || Boolean(state.ludo.ready?.[state.user?.id]);
+    ludoReadyBtn.textContent = state.ludo.ready?.[state.user?.id] ? "Ready ✓" : "Ready";
+  }
+  if (ludoStartBtn) {
+    ludoStartBtn.disabled = !canStart;
+    ludoStartBtn.classList.toggle("hidden", !isHost && state.ludo.status !== "waiting");
+  }
+  ludoRollBtn.textContent = pending?.playerId === state.user?.id ? "Select pawn" : state.ludo.winner ? "Round finished" : "Roll dice";
+  ludoRollBtn.disabled = state.ludo.status !== "active" || Boolean(state.ludo.winner) || !isMyTurn || Boolean(pending);
+  ludoRollBtn.classList.toggle("hidden", state.ludo.status === "active" && !state.ludo.winner && !isMyTurn && !pending);
 
   const cell = 40;
   const path = ludoPathPoints();
   const homes = [
-    { x: 0, y: 9, color: LUDO_COLORS[0], label: "GREEN" },
-    { x: 0, y: 0, color: LUDO_COLORS[1], label: "RED" },
-    { x: 9, y: 0, color: LUDO_COLORS[2], label: "BLUE" },
-    { x: 9, y: 9, color: LUDO_COLORS[3], label: "YELLOW" },
+    { x: 0, y: 0, color: LUDO_COLOR_HEX.red, label: "RED" },
+    { x: 9, y: 0, color: LUDO_COLOR_HEX.blue, label: "BLUE" },
+    { x: 9, y: 9, color: LUDO_COLOR_HEX.yellow, label: "YELLOW" },
+    { x: 0, y: 9, color: LUDO_COLOR_HEX.green, label: "GREEN" },
   ];
   const homeSvg = homes.map((home, index) => {
     const slots = [[1.5, 1.5], [4.5, 1.5], [1.5, 4.5], [4.5, 4.5]];
@@ -1052,24 +1218,25 @@ function renderLudo() {
   }).join("");
   const pathSvg = path.map(([x, y], index) => {
     const isSafe = LUDO_SAFE_TILES.includes(index);
-    const startIndex = LUDO_START_OFFSETS.indexOf(index);
-    const startClass = startIndex >= 0 ? `start p${startIndex}` : "";
+    const startColor = Object.entries(LUDO_COLOR_STARTS).find(([, start]) => start === index)?.[0] || "";
+    const startClass = startColor ? `start ${startColor}` : "";
     return `
       <g class="ludo-cell ${isSafe ? "safe" : ""} ${startClass}">
         <rect x="${x * cell}" y="${y * cell}" width="${cell}" height="${cell}" rx="6"></rect>
-        <text x="${x * cell + 20}" y="${y * cell + 26}">${isSafe ? "★" : ""}</text>
+        <text x="${x * cell + 20}" y="${y * cell + 26}">${isSafe ? "🛡" : ""}</text>
       </g>
     `;
   }).join("");
   const laneSvg = ludoHomeLaneCells().map((tile) => `
-    <rect class="ludo-home-lane p${tile.player}" x="${tile.x * cell}" y="${tile.y * cell}" width="${cell}" height="${cell}" rx="6"></rect>
+    <rect class="ludo-home-lane ${tile.color}" x="${tile.x * cell}" y="${tile.y * cell}" width="${cell}" height="${cell}" rx="6"></rect>
   `).join("");
   const tokens = players.map((player, playerIndex) => {
     return state.ludo.pawns[playerIndex].map((progress, pawnIndex) => {
-      const { x, y } = ludoPawnPoint(playerIndex, pawnIndex, progress);
+      const { x, y } = ludoPawnPoint(player.colorName, pawnIndex, progress);
       const active = activePlayer.id === player.id && !state.ludo.winner;
+      const canMove = movable.has(pawnIndex);
       return `
-        <g class="svg-token ludo-token ${active ? "active" : ""}" transform="translate(${x} ${y})">
+        <g class="svg-token ludo-token ${active ? "active" : ""} ${canMove ? "movable" : ""}" data-pawn="${pawnIndex}" transform="translate(${x} ${y})">
           <path d="M0,-20 C11,-20 17,-9 9,-1 L17,16 C18,21 14,24 9,24 L-9,24 C-14,24 -18,21 -17,16 L-9,-1 C-17,-9 -11,-20 0,-20Z" fill="${player.color}"></path>
           <text y="9">${pawnIndex + 1}</text>
         </g>
@@ -1093,55 +1260,60 @@ function renderLudo() {
       ${tokens}
     </svg>
   `;
+  ludoBoard.querySelectorAll(".ludo-token.movable").forEach((token) => {
+    token.addEventListener("click", () => moveLudoPawn(Number(token.dataset.pawn)));
+  });
 }
 
-function ludoBoardIndex(playerIndex, progress) {
-  return (progress + LUDO_START_OFFSETS[playerIndex]) % 52;
+function ludoBoardIndex(colorName, progress) {
+  return (progress + (LUDO_COLOR_STARTS[colorName] || 0)) % 52;
 }
 
-function ludoPawnPoint(playerIndex, pawnIndex, progress) {
-  if (progress < 0) return ludoYardPoint(playerIndex, pawnIndex);
-  if (progress === 57) return ludoFinishedPoint(playerIndex, pawnIndex);
-  if (progress >= 52) return ludoHomeLanePoint(playerIndex, progress - 52, pawnIndex);
-  const [cellX, cellY] = ludoPathPoints()[ludoBoardIndex(playerIndex, progress)];
+function ludoPawnPoint(colorName, pawnIndex, progress) {
+  if (progress < 0) return ludoYardPoint(colorName, pawnIndex);
+  if (progress === 57) return ludoFinishedPoint(colorName, pawnIndex);
+  if (progress >= 52) return ludoHomeLanePoint(colorName, progress - 52, pawnIndex);
+  const [cellX, cellY] = ludoPathPoints()[ludoBoardIndex(colorName, progress)];
   const offsets = [[-9, -9], [9, -9], [-9, 9], [9, 9]];
   const [dx, dy] = offsets[pawnIndex] || [0, 0];
   return { x: cellX * 40 + 20 + dx, y: cellY * 40 + 20 + dy };
 }
 
-function ludoYardPoint(playerIndex, pawnIndex) {
-  const homeOrigins = [[0, 9], [0, 0], [9, 0], [9, 9]];
+function ludoYardPoint(colorName, pawnIndex) {
+  const homeOrigins = [[0, 0], [9, 0], [9, 9], [0, 9]];
   const slots = [[1.5, 1.5], [4.5, 1.5], [1.5, 4.5], [4.5, 4.5]];
-  const [ox, oy] = homeOrigins[playerIndex] || homeOrigins[0];
+  const [ox, oy] = homeOrigins[LUDO_HOME_INDEX[colorName] ?? 0] || homeOrigins[0];
   const [sx, sy] = slots[pawnIndex] || slots[0];
   return { x: (ox + sx) * 40, y: (oy + sy) * 40 };
 }
 
-function ludoHomeLanePoint(playerIndex, step, pawnIndex) {
-  const lane = [
-    [[7, 13], [7, 12], [7, 11], [7, 10], [7, 9], [7, 8]],
-    [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7], [6, 7]],
-    [[7, 1], [7, 2], [7, 3], [7, 4], [7, 5], [7, 6]],
-    [[13, 7], [12, 7], [11, 7], [10, 7], [9, 7], [8, 7]],
-  ][playerIndex] || [];
+function ludoHomeLanePoint(colorName, step, pawnIndex) {
+  const lanes = {
+    green: [[7, 13], [7, 12], [7, 11], [7, 10], [7, 9], [7, 8]],
+    red: [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7], [6, 7]],
+    blue: [[7, 1], [7, 2], [7, 3], [7, 4], [7, 5], [7, 6]],
+    yellow: [[13, 7], [12, 7], [11, 7], [10, 7], [9, 7], [8, 7]],
+  };
+  const lane = lanes[colorName] || lanes.red;
   const [cellX, cellY] = lane[Math.max(0, Math.min(5, step))] || [7, 7];
   const offsets = [[-6, -6], [6, -6], [-6, 6], [6, 6]];
   const [dx, dy] = offsets[pawnIndex] || [0, 0];
   return { x: cellX * 40 + 20 + dx, y: cellY * 40 + 20 + dy };
 }
 
-function ludoFinishedPoint(playerIndex, pawnIndex) {
+function ludoFinishedPoint(colorName, pawnIndex) {
   const offsets = [[-17, -17], [17, -17], [-17, 17], [17, 17]];
   const [dx, dy] = offsets[pawnIndex] || [0, 0];
-  return { x: 300 + dx + (playerIndex - 1.5) * 4, y: 300 + dy + (playerIndex - 1.5) * 4 };
+  const shift = (LUDO_HOME_INDEX[colorName] ?? 0) - 1.5;
+  return { x: 300 + dx + shift * 4, y: 300 + dy + shift * 4 };
 }
 
 function ludoHomeLaneCells() {
   return [
-    ...[[7, 13], [7, 12], [7, 11], [7, 10], [7, 9], [7, 8]].map(([x, y]) => ({ x, y, player: 0 })),
-    ...[[1, 7], [2, 7], [3, 7], [4, 7], [5, 7], [6, 7]].map(([x, y]) => ({ x, y, player: 1 })),
-    ...[[7, 1], [7, 2], [7, 3], [7, 4], [7, 5], [7, 6]].map(([x, y]) => ({ x, y, player: 2 })),
-    ...[[13, 7], [12, 7], [11, 7], [10, 7], [9, 7], [8, 7]].map(([x, y]) => ({ x, y, player: 3 })),
+    ...[[7, 13], [7, 12], [7, 11], [7, 10], [7, 9], [7, 8]].map(([x, y]) => ({ x, y, color: "green" })),
+    ...[[1, 7], [2, 7], [3, 7], [4, 7], [5, 7], [6, 7]].map(([x, y]) => ({ x, y, color: "red" })),
+    ...[[7, 1], [7, 2], [7, 3], [7, 4], [7, 5], [7, 6]].map(([x, y]) => ({ x, y, color: "blue" })),
+    ...[[13, 7], [12, 7], [11, 7], [10, 7], [9, 7], [8, 7]].map(([x, y]) => ({ x, y, color: "yellow" })),
   ];
 }
 
@@ -1386,10 +1558,6 @@ function renderSearchResults(results) {
     card.querySelector(".queue-btn").addEventListener("click", () => addQueueItem(result));
     searchResults.appendChild(card);
   });
-}
-
-function rollDice() {
-  return Math.floor(Math.random() * 6) + 1;
 }
 
 function diceFace(value) {

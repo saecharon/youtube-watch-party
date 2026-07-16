@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>YouTube Watch Party</title>
-    <link rel="stylesheet" href="/styles.css?v=advanced-ludo-1">
+    <link rel="stylesheet" href="/styles.css?v=ludo-prod-1">
   </head>
   <body class="theme-party">
     <main class="app-shell">
@@ -283,7 +283,12 @@
                 </div>
                 <div class="game-rule">
                   <strong>Rules:</strong>
-                  <span>Roll 6 to open, safe star tiles protect pawns, captures send rivals home, and all 4 pawns must finish.</span>
+                  <span>Ready up, host starts, roll 6 to open, tap highlighted pawns, safe stars protect, captures give bonus.</span>
+                </div>
+                <div class="ludo-setup">
+                  <button id="ludoReadyBtn" class="secondary-button" type="button">Ready</button>
+                  <button id="ludoStartBtn" class="primary-button" type="button">Start Ludo</button>
+                  <span id="ludoReadyText">Waiting for players</span>
                 </div>
                 <div id="ludoBoard" class="ludo-board"></div>
                 <div class="game-action">
@@ -371,6 +376,7 @@
           </aside>
         </section>
       </section>
+      <div id="toastDock" class="toast-dock" aria-live="polite" aria-atomic="false"></div>
       <footer class="app-footer">
         <span>Live rooms</span>
         <a href="/privacy.html">Privacy</a>
@@ -379,6 +385,6 @@
     </main>
 
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script src="/app.js?v=advanced-ludo-1"></script>
+    <script src="/app.js?v=ludo-prod-1"></script>
   </body>
 </html>

@@ -1060,6 +1060,54 @@ input:focus {
   text-shadow: 0 12px 28px rgba(0, 0, 0, 0.42);
 }
 
+.toast-dock {
+  position: fixed;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(14px, env(safe-area-inset-bottom));
+  z-index: 50;
+  display: grid;
+  gap: 8px;
+  width: min(340px, calc(100vw - 28px));
+  pointer-events: none;
+}
+
+.toast {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background:
+    linear-gradient(135deg, rgba(255, 60, 172, 0.18), rgba(0, 212, 255, 0.14)),
+    rgba(14, 17, 27, 0.95);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
+  opacity: 0;
+  transform: translateY(12px) scale(0.98);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.toast.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.toast strong,
+.toast span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toast strong {
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+.toast span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 @keyframes floatUp {
   from {
     opacity: 0;
@@ -1398,7 +1446,7 @@ input:focus {
 
 .person-pill {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
+  grid-template-columns: 42px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
   border: 1px solid var(--line);
@@ -1433,6 +1481,21 @@ input:focus {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
+}
+
+.host-transfer-btn {
+  grid-column: 3;
+  grid-row: 1 / span 3;
+  align-self: center;
+  min-height: 30px;
+  border: 1px solid rgba(0, 212, 255, 0.34);
+  border-radius: 8px;
+  padding: 0 9px;
+  color: #eafdff;
+  background: rgba(0, 212, 255, 0.12);
+  font-size: 0.72rem;
+  font-weight: 900;
+  cursor: pointer;
 }
 
 .badge-row span {
@@ -1564,6 +1627,30 @@ input:focus {
   background: linear-gradient(135deg, #ff3cac, #00d4ff);
   color: #fff;
   box-shadow: 0 0 24px rgba(255, 60, 172, 0.5);
+}
+
+.ludo-setup {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.ludo-setup button {
+  min-height: 36px;
+}
+
+.ludo-setup span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @keyframes dicePulse {
@@ -1794,28 +1881,28 @@ input:focus {
   stroke-width: 3;
 }
 
-.ludo-cell.start.p0 rect,
-.ludo-home-lane.p0 {
-  fill: #bff3d0;
-  stroke: #16b75f;
-}
-
-.ludo-cell.start.p1 rect,
-.ludo-home-lane.p1 {
+.ludo-cell.start.red rect,
+.ludo-home-lane.red {
   fill: #ffd2d7;
   stroke: #e7333f;
 }
 
-.ludo-cell.start.p2 rect,
-.ludo-home-lane.p2 {
+.ludo-cell.start.blue rect,
+.ludo-home-lane.blue {
   fill: #d3eaff;
   stroke: #1d8dff;
 }
 
-.ludo-cell.start.p3 rect,
-.ludo-home-lane.p3 {
+.ludo-cell.start.yellow rect,
+.ludo-home-lane.yellow {
   fill: #ffef9c;
   stroke: #c99a00;
+}
+
+.ludo-cell.start.green rect,
+.ludo-home-lane.green {
+  fill: #bff3d0;
+  stroke: #16b75f;
 }
 
 .ludo-home-lane {
@@ -1851,6 +1938,31 @@ input:focus {
 
 .ludo-token.active {
   filter: drop-shadow(0 0 13px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 20px rgba(255, 60, 172, 0.75));
+}
+
+.ludo-token.movable {
+  cursor: pointer;
+  animation: tokenReady 760ms ease-in-out infinite alternate;
+}
+
+.ludo-token.movable path {
+  stroke: #fff8a8;
+  stroke-width: 7;
+}
+
+@keyframes tokenReady {
+  from {
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: scale(1);
+    filter: drop-shadow(0 0 10px rgba(255, 248, 168, 0.75));
+  }
+  to {
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: scale(1.14);
+    filter: drop-shadow(0 0 22px rgba(255, 60, 172, 0.95));
+  }
 }
 
 .snake-board-title {

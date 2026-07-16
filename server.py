@@ -40,7 +40,14 @@ OTP_REQUEST_LIMIT = 3
 OTP_VERIFY_LIMIT = 8
 MAX_CHAT_IMAGE_CHARS = 3_400_000
 LUDO_SAFE_TILES = {0, 8, 13, 21, 26, 34, 39, 47}
-LUDO_START_OFFSETS = [0, 13, 26, 39]
+LUDO_COLOR_ORDER = {
+    1: ["red"],
+    2: ["red", "green"],
+    3: ["red", "green", "yellow"],
+    4: ["red", "green", "yellow", "blue"],
+}
+LUDO_COLOR_STARTS = {"red": 13, "green": 0, "yellow": 39, "blue": 26}
+LUDO_HOME_ORDER = {"red": 0, "blue": 1, "yellow": 2, "green": 3}
 
 THEMES = {
     "late-night": {"name": "Late Night", "emoji": "🌙"},
@@ -270,14 +277,30 @@ def room_game_players(room: dict) -> list[dict]:
     return users
 
 
+def ludo_color_order(count: int) -> list[str]:
+    return LUDO_COLOR_ORDER.get(max(1, min(4, count)), LUDO_COLOR_ORDER[4])[:count]
+
+
 def default_games(count: int = 1) -> dict:
+    colors = ludo_color_order(count)
     return {
         "ludo": {
+            "gameId": secrets.token_urlsafe(8),
+            "gameVersion": 2,
+            "status": "waiting",
+            "players": [],
+            "colors": colors,
+            "ready": {},
             "turn": 0,
+            "turnNumber": 1,
             "pawns": [[-1, -1, -1, -1] for _ in range(count)],
+            "pendingRoll": None,
+            "rollHistory": [],
+            "sixStreak": [0 for _ in range(count)],
+            "ranking": [],
             "winner": None,
             "lastRoll": None,
-            "message": "New Ludo round. Roll a 6 to open a pawn.",
+            "message": "Press Ready. Host starts Ludo when 2-4 players are ready.",
             "updatedAt": now_ms(),
         },
         "snakes": {
@@ -321,13 +344,39 @@ def normalize_games(room: dict) -> dict:
     games = room.setdefault("games", default_games(count))
     ludo = games.setdefault("ludo", default_games(count)["ludo"])
     snakes = games.setdefault("snakes", default_games(count)["snakes"])
+    active_player_ids = [player.get("id", "") for player in room_game_players(room)[:4]]
+    if ludo.get("status") in {"active", "finished", "paused"}:
+        ludo_players = [player_id for player_id in ludo.get("players", []) if player_id in room["users"]]
+        if not ludo_players:
+            ludo_players = active_player_ids[:4]
+    else:
+        ludo_players = active_player_ids[:4]
+    ludo_count = max(1, len(ludo_players))
+    colors = ludo_color_order(ludo_count)
+    ludo.setdefault("gameId", secrets.token_urlsafe(8))
+    ludo["gameVersion"] = 2
+    ludo["status"] = ludo.get("status") if ludo.get("status") in {"waiting", "active", "finished", "paused"} else "waiting"
+    ludo["players"] = ludo_players
+    ludo["colors"] = colors
+    ludo["ready"] = {player_id: bool(ludo.get("ready", {}).get(player_id)) for player_id in active_player_ids[:4]}
+    ludo["turnNumber"] = max(1, int(ludo.get("turnNumber", 1) or 1))
+    ludo["pendingRoll"] = ludo.get("pendingRoll") if isinstance(ludo.get("pendingRoll"), dict) else None
+    ludo["rollHistory"] = (ludo.get("rollHistory") if isinstance(ludo.get("rollHistory"), list) else [])[-120:]
+    ludo["sixStreak"] = normalize_slots(ludo.get("sixStreak"), ludo_count, 0)
+    ludo["ranking"] = ludo.get("ranking") if isinstance(ludo.get("ranking"), list) else []
+    if ludo["status"] == "active":
+        online_ids = {player.get("id") for player in active_users(room) if player.get("online")}
+        if not any(player_id in online_ids for player_id in ludo_players):
+            ludo["status"] = "paused"
+            ludo["message"] = "Ludo paused. Waiting for players to reconnect."
     ludo["pawns"] = normalize_ludo_pawns(ludo.get("pawns"), count)
+    ludo["pawns"] = normalize_ludo_pawns(ludo.get("pawns"), ludo_count)
     snakes["positions"] = normalize_slots(snakes.get("positions"), count, 1)
-    ludo["turn"] = int(ludo.get("turn", 0) or 0) % count
+    ludo["turn"] = int(ludo.get("turn", 0) or 0) % ludo_count
     snakes["turn"] = int(snakes.get("turn", 0) or 0) % count
     ludo.setdefault("winner", None)
     ludo.setdefault("lastRoll", None)
-    ludo.setdefault("message", "New Ludo round. Roll a 6 to open a pawn.")
+    ludo.setdefault("message", "Press Ready. Host starts Ludo when 2-4 players are ready.")
     snakes.setdefault("winner", None)
     snakes.setdefault("lastRoll", None)
     snakes.setdefault("message", "New Snake & Ladder round. First exact 100 wins.")
@@ -338,8 +387,19 @@ def games_snapshot(room: dict) -> dict:
     games = normalize_games(room)
     return {
         "ludo": {
+            "gameId": games["ludo"].get("gameId"),
+            "gameVersion": games["ludo"].get("gameVersion", 2),
+            "status": games["ludo"].get("status", "waiting"),
+            "players": games["ludo"].get("players", [])[:],
+            "colors": games["ludo"].get("colors", [])[:],
+            "ready": dict(games["ludo"].get("ready", {})),
             "turn": games["ludo"]["turn"],
+            "turnNumber": games["ludo"].get("turnNumber", 1),
             "pawns": [row[:] for row in games["ludo"]["pawns"]],
+            "pendingRoll": dict(games["ludo"].get("pendingRoll") or {}) or None,
+            "rollHistory": games["ludo"].get("rollHistory", [])[-12:],
+            "sixStreak": games["ludo"].get("sixStreak", [])[:],
+            "ranking": games["ludo"].get("ranking", [])[:],
             "winner": games["ludo"].get("winner"),
             "lastRoll": games["ludo"].get("lastRoll"),
             "message": games["ludo"].get("message", ""),
@@ -533,56 +593,53 @@ def snake_jumps() -> dict[int, dict]:
     }
 
 
-def ludo_board_index(player_index: int, progress: int) -> int:
-    return (progress + LUDO_START_OFFSETS[player_index]) % 52
+def ludo_board_index(color: str, progress: int) -> int:
+    return (progress + LUDO_COLOR_STARTS.get(color, 0)) % 52
 
 
-def ludo_capture_count(pawns: list[list[int]], player_index: int, landing_progress: int) -> int:
+def ludo_capture_count(pawns: list[list[int]], colors: list[str], player_index: int, landing_progress: int) -> int:
     if landing_progress < 0 or landing_progress >= 52:
         return 0
-    landing = ludo_board_index(player_index, landing_progress)
+    landing = ludo_board_index(colors[player_index], landing_progress)
     if landing in LUDO_SAFE_TILES:
         return 0
     total = 0
     for rival_index, rival_pawns in enumerate(pawns):
         if rival_index == player_index:
             continue
-        total += sum(1 for position in rival_pawns if 0 <= position < 52 and ludo_board_index(rival_index, position) == landing)
+        total += sum(1 for position in rival_pawns if 0 <= position < 52 and ludo_board_index(colors[rival_index], position) == landing)
     return total
 
 
-def ludo_candidates(pawns: list[list[int]], player_index: int, roll: int) -> list[dict]:
+def ludo_candidates(pawns: list[list[int]], colors: list[str], player_index: int, roll: int) -> list[dict]:
     candidates = []
     for pawn_index, position in enumerate(pawns[player_index]):
         if position == 57:
             continue
         if position < 0:
             if roll == 6:
-                candidates.append({"pawnIndex": pawn_index, "from": position, "to": 0, "opens": True, "finishes": False, "captures": ludo_capture_count(pawns, player_index, 0)})
+                candidates.append({"pawnIndex": pawn_index, "from": position, "to": 0, "opens": True, "finishes": False, "captures": ludo_capture_count(pawns, colors, player_index, 0)})
             continue
         to = position + roll
         if to <= 57:
-            candidates.append({"pawnIndex": pawn_index, "from": position, "to": to, "opens": False, "finishes": to == 57, "captures": ludo_capture_count(pawns, player_index, to)})
+            candidates.append({"pawnIndex": pawn_index, "from": position, "to": to, "opens": False, "finishes": to == 57, "captures": ludo_capture_count(pawns, colors, player_index, to)})
     return candidates
 
 
-def choose_ludo_move(candidates: list[dict]) -> dict:
-    return sorted(
-        candidates,
-        key=lambda move: (
-            0 if move["finishes"] else 1,
-            -move["captures"],
-            1 if move["opens"] else 0,
-            -move["to"],
-        ),
-    )[0]
+def ludo_player_map(room: dict, game_state: dict) -> list[dict]:
+    players = []
+    for player_id in game_state.get("players", []):
+        user = room["users"].get(player_id)
+        if user:
+            players.append(user)
+    return players
 
 
-def capture_ludo_rivals(pawns: list[list[int]], players: list[dict], player_index: int, pawn_index: int) -> str:
+def capture_ludo_rivals(pawns: list[list[int]], colors: list[str], players: list[dict], player_index: int, pawn_index: int) -> str:
     progress = pawns[player_index][pawn_index]
     if progress < 0 or progress >= 52:
         return ""
-    landing = ludo_board_index(player_index, progress)
+    landing = ludo_board_index(colors[player_index], progress)
     if landing in LUDO_SAFE_TILES:
         return ""
     captured = []
@@ -592,10 +649,24 @@ def capture_ludo_rivals(pawns: list[list[int]], players: list[dict], player_inde
         for rival_pawn_index, position in enumerate(rival_pawns):
             if position < 0 or position >= 52:
                 continue
-            if ludo_board_index(rival_index, position) == landing:
+            if ludo_board_index(colors[rival_index], position) == landing:
                 pawns[rival_index][rival_pawn_index] = -1
                 captured.append(players[rival_index].get("name", f"Player {rival_index + 1}"))
     return ", ".join(captured)
+
+
+def next_ludo_turn(game_state: dict, player_count: int) -> None:
+    game_state["turn"] = (int(game_state.get("turn", 0)) + 1) % max(1, player_count)
+    game_state["turnNumber"] = int(game_state.get("turnNumber", 1)) + 1
+    game_state["pendingRoll"] = None
+
+
+def reset_ludo_round(players: list[dict]) -> dict:
+    game = default_games(max(1, len(players)))["ludo"]
+    game["players"] = [player.get("id", "") for player in players]
+    game["colors"] = ludo_color_order(len(players))
+    game["ready"] = {player.get("id", ""): False for player in players}
+    return game
 
 
 def roll_dice() -> int:
@@ -759,6 +830,9 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
         if path == "/api/queue/vote":
             self.handle_queue_vote(room_id, user_id, data)
             return
+        if path == "/api/queue/remove":
+            self.handle_queue_remove(room_id, user_id, data)
+            return
         if path == "/api/queue/play":
             self.handle_queue_play(room_id, user_id, data)
             return
@@ -774,11 +848,23 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
         if path == "/api/game/roll":
             self.handle_game_roll(room_id, user_id, data)
             return
+        if path == "/api/game/move":
+            self.handle_ludo_move(room_id, user_id, data)
+            return
+        if path == "/api/game/ready":
+            self.handle_ludo_ready(room_id, user_id)
+            return
+        if path == "/api/game/start":
+            self.handle_ludo_start(room_id, user_id)
+            return
         if path == "/api/game/reset":
             self.handle_game_reset(room_id, user_id, data)
             return
         if path == "/api/host/claim":
             self.handle_host_claim(room_id, user_id)
+            return
+        if path == "/api/host/transfer":
+            self.handle_host_transfer(room_id, user_id, data)
             return
 
         self.send_error(HTTPStatus.NOT_FOUND)
@@ -1087,6 +1173,25 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
             snapshot = room_snapshot(room_id, room)
         self.json_response({"ok": True, "room": snapshot})
 
+    def handle_queue_remove(self, room_id: str, user_id: str, data: dict) -> None:
+        item_id = str(data.get("itemId", ""))
+        with lock:
+            room = rooms[room_id]
+            user = room["users"][user_id]
+            item = next((entry for entry in room["queue"] if entry.get("id") == item_id), None)
+            if not item:
+                self.json_response({"error": "Queue item not found."}, HTTPStatus.NOT_FOUND)
+                return
+            if item.get("addedById") != user_id and room.get("hostId") != user_id:
+                self.json_response({"error": "Only the host or the person who added it can remove this song."}, HTTPStatus.FORBIDDEN)
+                return
+            room["queue"] = [entry for entry in room["queue"] if entry.get("id") != item_id]
+            title = item.get("title", "song")
+            make_event(room, "queue", {"message": f"{user['name']} removed “{title}” from the queue."})
+            make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+            snapshot = room_snapshot(room_id, room)
+        self.json_response({"ok": True, "room": snapshot})
+
     def handle_queue_play(self, room_id: str, user_id: str, data: dict) -> None:
         item_id = str(data.get("itemId", ""))
         with lock:
@@ -1148,9 +1253,9 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
         with lock:
             room = rooms[room_id]
             games = normalize_games(room)
-            players = room_game_players(room)
+            players = ludo_player_map(room, games["ludo"]) if game == "ludo" else room_game_players(room)
             if user_id not in {player.get("id") for player in players}:
-                self.json_response({"error": "Join the first 4 players to play this round."}, HTTPStatus.FORBIDDEN)
+                self.json_response({"error": "Join this game as one of the first 4 players."}, HTTPStatus.FORBIDDEN)
                 return
             game_state = games[game]
             active_index = game_state["turn"] % len(players)
@@ -1158,6 +1263,15 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
             if active_user.get("id") != user_id:
                 self.json_response({"error": f"It is {active_user.get('name', 'another player')}'s turn."}, HTTPStatus.CONFLICT)
                 return
+            if game == "ludo" and game_state.get("pendingRoll"):
+                self.json_response({"error": "Select a movable pawn before rolling again."}, HTTPStatus.CONFLICT)
+                return
+            if game == "ludo" and game_state.get("status") != "active":
+                if game_state.get("status") == "paused":
+                    game_state["status"] = "active"
+                else:
+                    self.json_response({"error": "Host must start Ludo after players press Ready."}, HTTPStatus.CONFLICT)
+                    return
             roll = roll_dice()
             if game == "ludo":
                 message, extra_turn = self.apply_ludo_roll(game_state, players, active_index, roll)
@@ -1166,7 +1280,7 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
             game_state["lastRoll"] = roll
             game_state["message"] = message
             game_state["updatedAt"] = now_ms()
-            if not extra_turn:
+            if game != "ludo" and not extra_turn:
                 game_state["turn"] = (game_state["turn"] + 1) % len(players)
             payload = {"game": game, "message": message, "roll": roll, "by": active_user.get("name", "Player"), "snapshot": games_snapshot(room)}
             make_event(room, "game", payload)
@@ -1175,20 +1289,65 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
         self.json_response({"ok": True, "room": snapshot, "message": message, "roll": roll})
 
     def apply_ludo_roll(self, game_state: dict, players: list[dict], player_index: int, roll: int) -> tuple[str, bool]:
+        if game_state.get("status") != "active":
+            return f"{game_state.get('winner') or 'This round'} already finished. Reset for a new Ludo round.", False
         if game_state.get("winner"):
             return f"{game_state['winner']} already won Ludo. Reset for a new round.", False
         player = players[player_index]
         pawns = game_state["pawns"]
-        candidates = ludo_candidates(pawns, player_index, roll)
+        colors = game_state.get("colors") or ludo_color_order(len(players))
+        record = {
+            "gameId": game_state.get("gameId"),
+            "playerId": player.get("id", ""),
+            "diceValue": roll,
+            "turnNumber": game_state.get("turnNumber", 1),
+            "gameVersion": game_state.get("gameVersion", 2),
+            "timestamp": now_ms(),
+        }
+        game_state.setdefault("rollHistory", []).append(record)
+        game_state["rollHistory"] = game_state["rollHistory"][-120:]
+        game_state["sixStreak"] = normalize_slots(game_state.get("sixStreak"), len(players), 0)
+        if roll == 6:
+            game_state["sixStreak"][player_index] += 1
+        else:
+            game_state["sixStreak"][player_index] = 0
+        if game_state["sixStreak"][player_index] >= 3:
+            game_state["pendingRoll"] = None
+            game_state["sixStreak"][player_index] = 0
+            message = f"{player['name']} rolled three sixes. Third six is cancelled and turn passes."
+            next_ludo_turn(game_state, len(players))
+            return message, False
+        game_state["lastRoll"] = roll
+        candidates = ludo_candidates(pawns, colors, player_index, roll)
         if not candidates:
             locked = all(position < 0 for position in pawns[player_index])
             reason = "Need a 6 to open a pawn." if locked and roll != 6 else "No legal move; exact roll is needed near HOME."
-            return f"{player['name']} rolled {roll}. {reason}", roll == 6
-        move = choose_ludo_move(candidates)
+            next_ludo_turn(game_state, len(players))
+            return f"{player['name']} rolled {roll}. {reason}", False
+        if len(candidates) > 1:
+            game_state["pendingRoll"] = {
+                "playerIndex": player_index,
+                "playerId": player.get("id", ""),
+                "diceValue": roll,
+                "movable": [move["pawnIndex"] for move in candidates],
+                "moves": candidates,
+                "rolledAt": now_ms(),
+            }
+            return f"{player['name']} rolled {roll}. Select one highlighted pawn.", True
+        return self.apply_ludo_move_choice(game_state, players, player_index, candidates[0])
+
+    def apply_ludo_move_choice(self, game_state: dict, players: list[dict], player_index: int, move: dict) -> tuple[str, bool]:
+        player = players[player_index]
+        pawns = game_state["pawns"]
+        colors = game_state.get("colors") or ludo_color_order(len(players))
+        roll = int(game_state.get("lastRoll") or game_state.get("pendingRoll", {}).get("diceValue") or 0)
         pawns[player_index][move["pawnIndex"]] = move["to"]
-        captured = capture_ludo_rivals(pawns, players, player_index, move["pawnIndex"])
+        captured = capture_ludo_rivals(pawns, colors, players, player_index, move["pawnIndex"])
+        game_state["pendingRoll"] = None
         if all(position == 57 for position in pawns[player_index]):
             game_state["winner"] = player["name"]
+            game_state["status"] = "finished"
+            game_state.setdefault("ranking", []).append({"playerId": player.get("id"), "name": player["name"], "at": now_ms()})
             return f"{player['name']} brought all 4 pawns HOME and won Ludo.", False
         if move["from"] < 0:
             action = f"opened pawn {move['pawnIndex'] + 1}"
@@ -1200,7 +1359,90 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
             action = f"moved pawn {move['pawnIndex'] + 1}"
         capture_text = f" Captured {captured}." if captured else ""
         extra = roll == 6 or bool(captured) or move["to"] == 57
+        if not extra:
+            game_state["sixStreak"][player_index] = 0
+            next_ludo_turn(game_state, len(players))
+        else:
+            game_state["turnNumber"] = int(game_state.get("turnNumber", 1)) + 1
         return f"{player['name']} rolled {roll} and {action}.{capture_text}{' Roll again.' if extra else ''}", extra
+
+    def handle_ludo_move(self, room_id: str, user_id: str, data: dict) -> None:
+        try:
+            pawn_index = int(data.get("pawnIndex", -1))
+        except (TypeError, ValueError):
+            pawn_index = -1
+        with lock:
+            room = rooms[room_id]
+            games = normalize_games(room)
+            game_state = games["ludo"]
+            players = ludo_player_map(room, game_state)
+            pending = game_state.get("pendingRoll") or {}
+            if not pending:
+                self.json_response({"error": "Roll first, then select a highlighted pawn."}, HTTPStatus.CONFLICT)
+                return
+            if pending.get("playerId") != user_id:
+                self.json_response({"error": "Only the active player can move this pawn."}, HTTPStatus.FORBIDDEN)
+                return
+            if pawn_index not in pending.get("movable", []):
+                self.json_response({"error": "That pawn cannot move for this dice roll."}, HTTPStatus.BAD_REQUEST)
+                return
+            player_index = int(pending.get("playerIndex", 0))
+            move = next((item for item in pending.get("moves", []) if item.get("pawnIndex") == pawn_index), None)
+            if not move:
+                self.json_response({"error": "Move expired. Roll again."}, HTTPStatus.CONFLICT)
+                return
+            game_state["lastRoll"] = int(pending.get("diceValue") or 0)
+            message, _extra = self.apply_ludo_move_choice(game_state, players, player_index, move)
+            game_state["message"] = message
+            game_state["updatedAt"] = now_ms()
+            make_event(room, "game", {"game": "ludo", "message": message, "by": players[player_index].get("name", "Player"), "snapshot": games_snapshot(room)})
+            make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+            snapshot = room_snapshot(room_id, room)
+        self.json_response({"ok": True, "room": snapshot, "message": message})
+
+    def handle_ludo_ready(self, room_id: str, user_id: str) -> None:
+        with lock:
+            room = rooms[room_id]
+            games = normalize_games(room)
+            ludo = games["ludo"]
+            players = room_game_players(room)[:4]
+            if user_id not in {player.get("id") for player in players}:
+                self.json_response({"error": "Only the first 4 room members can ready up for Ludo."}, HTTPStatus.FORBIDDEN)
+                return
+            ludo["players"] = [player.get("id", "") for player in players]
+            ludo["colors"] = ludo_color_order(len(players))
+            ludo["ready"][user_id] = True
+            user = room["users"][user_id]
+            ludo["message"] = f"{user['name']} is ready for Ludo."
+            make_event(room, "game", {"game": "ludo", "message": ludo["message"], "by": user["name"], "snapshot": games_snapshot(room)})
+            make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+            snapshot = room_snapshot(room_id, room)
+        self.json_response({"ok": True, "room": snapshot})
+
+    def handle_ludo_start(self, room_id: str, user_id: str) -> None:
+        with lock:
+            room = rooms[room_id]
+            if room.get("hostId") != user_id:
+                self.json_response({"error": "Only the host can start Ludo."}, HTTPStatus.FORBIDDEN)
+                return
+            players = room_game_players(room)[:4]
+            if len(players) < 2:
+                self.json_response({"error": "Need at least 2 players to start Ludo."}, HTTPStatus.BAD_REQUEST)
+                return
+            games = normalize_games(room)
+            ready = games["ludo"].get("ready", {})
+            missing = [player["name"] for player in players if not ready.get(player.get("id"))]
+            if missing:
+                self.json_response({"error": f"Waiting for ready: {', '.join(missing)}"}, HTTPStatus.CONFLICT)
+                return
+            games["ludo"] = reset_ludo_round(players)
+            games["ludo"]["status"] = "active"
+            games["ludo"]["ready"] = {player.get("id", ""): True for player in players}
+            games["ludo"]["message"] = f"Ludo started with {len(players)} players. {players[0]['name']} rolls first."
+            make_event(room, "game", {"game": "ludo", "message": games["ludo"]["message"], "by": room["users"][user_id]["name"], "snapshot": games_snapshot(room)})
+            make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+            snapshot = room_snapshot(room_id, room)
+        self.json_response({"ok": True, "room": snapshot})
 
     def apply_snakes_roll(self, game_state: dict, players: list[dict], player_index: int, roll: int) -> tuple[str, bool]:
         if game_state.get("winner"):
@@ -1229,10 +1471,13 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
             return
         with lock:
             room = rooms[room_id]
+            if game == "ludo" and room.get("hostId") != user_id:
+                self.json_response({"error": "Only the host can reset Ludo."}, HTTPStatus.FORBIDDEN)
+                return
             players = room_game_players(room)
             games = normalize_games(room)
             user = room["users"][user_id]
-            games[game] = default_games(len(players))[game]
+            games[game] = reset_ludo_round(players[:4]) if game == "ludo" else default_games(len(players))[game]
             label = "Ludo" if game == "ludo" else "Snake & Ladder"
             message = f"{user['name']} reset {label}."
             make_event(room, "game", {"game": game, "message": message, "by": user["name"], "snapshot": games_snapshot(room)})
@@ -1243,8 +1488,32 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
     def handle_host_claim(self, room_id: str, user_id: str) -> None:
         with lock:
             room = rooms[room_id]
+            current_host_id = room.get("hostId")
+            current_host = room["users"].get(current_host_id or "")
+            current_host_online = bool(current_host and current_host.get("lastSeen", 0) >= now_ms() - 15000)
+            if current_host_id and current_host_id != user_id and current_host_online:
+                self.json_response({"error": "Host is locked. Ask the current host to make you host."}, HTTPStatus.FORBIDDEN)
+                return
             room["hostId"] = user_id
             user = room["users"][user_id]
+            award_badges(user, "DJ")
+            make_event(room, "system", {"message": f"{user['name']} is hosting now."})
+            make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+            snapshot = room_snapshot(room_id, room)
+        self.json_response({"ok": True, "room": snapshot})
+
+    def handle_host_transfer(self, room_id: str, user_id: str, data: dict) -> None:
+        target_id = str(data.get("targetUserId", ""))
+        with lock:
+            room = rooms[room_id]
+            if room.get("hostId") != user_id:
+                self.json_response({"error": "Only the host can change host."}, HTTPStatus.FORBIDDEN)
+                return
+            if target_id not in room["users"]:
+                self.json_response({"error": "That person is not in this room."}, HTTPStatus.NOT_FOUND)
+                return
+            room["hostId"] = target_id
+            user = room["users"][target_id]
             award_badges(user, "DJ")
             make_event(room, "system", {"message": f"{user['name']} is hosting now."})
             make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
