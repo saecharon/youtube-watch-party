@@ -1149,7 +1149,7 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
 
     def handle_game_roll(self, room_id: str, user_id: str, data: dict) -> None:
         game = str(data.get("game", ""))
-        if game not in {"ludo", "snakes"}:
+        if game != "snakes":
             self.json_response({"error": "Unknown game"}, HTTPStatus.BAD_REQUEST)
             return
         with lock:
@@ -1166,10 +1166,7 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
                 self.json_response({"error": f"It is {active_user.get('name', 'another player')}'s turn."}, HTTPStatus.CONFLICT)
                 return
             roll = roll_dice()
-            if game == "ludo":
-                message, extra_turn = self.apply_ludo_roll(game_state, players, active_index, roll)
-            else:
-                message, extra_turn = self.apply_snakes_roll(game_state, players, active_index, roll)
+            message, extra_turn = self.apply_snakes_roll(game_state, players, active_index, roll)
             game_state["lastRoll"] = roll
             game_state["message"] = message
             game_state["updatedAt"] = now_ms()
@@ -1229,7 +1226,7 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
 
     def handle_game_reset(self, room_id: str, user_id: str, data: dict) -> None:
         game = str(data.get("game", ""))
-        if game not in {"ludo", "snakes"}:
+        if game != "snakes":
             self.json_response({"error": "Unknown game"}, HTTPStatus.BAD_REQUEST)
             return
         with lock:
@@ -1237,12 +1234,8 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
             players = room_game_players(room)
             games = normalize_games(room)
             user = room["users"][user_id]
-            if game == "ludo":
-                games["ludo"] = default_games(len(players))["ludo"]
-                message = f"{user['name']} reset Ludo."
-            else:
-                games["snakes"] = default_games(len(players))["snakes"]
-                message = f"{user['name']} reset Snake & Ladder."
+            games["snakes"] = default_games(len(players))["snakes"]
+            message = f"{user['name']} reset Snake & Ladder."
             make_event(room, "game", {"game": game, "message": message, "by": user["name"], "snapshot": games_snapshot(room)})
             make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
             snapshot = room_snapshot(room_id, room)

@@ -391,7 +391,7 @@ document.querySelectorAll("[data-game-tab]").forEach((button) => {
   });
 });
 
-ludoRollBtn.addEventListener("click", async () => {
+ludoRollBtn?.addEventListener("click", async () => {
   await rollRoomGame("ludo", ludoStatus);
 });
 
@@ -399,7 +399,7 @@ snakesRollBtn.addEventListener("click", async () => {
   await rollRoomGame("snakes", snakesStatus);
 });
 
-ludoResetBtn.addEventListener("click", async () => {
+ludoResetBtn?.addEventListener("click", async () => {
   if (!confirm("Reset this Ludo round?")) return;
   await resetRoomGame("ludo", ludoStatus);
 });
@@ -683,7 +683,6 @@ function handleEvent(event) {
   }
   if (event.type === "game") {
     if (event.payload.snapshot) applyGameSnapshot(event.payload.snapshot);
-    if (event.payload.message) appendSystem(`Game: ${event.payload.message}`);
     playGameNotice(event.payload.message || "");
     renderMiniGames();
   }

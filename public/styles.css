@@ -1571,6 +1571,47 @@ input:focus {
   background: rgba(255, 255, 255, 0.62);
 }
 
+#snakesGame .game-action {
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  border-radius: 18px;
+  padding: 12px;
+  background: linear-gradient(135deg, rgba(255, 60, 172, 0.14), rgba(0, 212, 255, 0.16));
+}
+
+#snakesGame .dice-chip {
+  width: 72px;
+  height: 72px;
+  border: 3px solid rgba(29, 24, 32, 0.16);
+  border-radius: 18px;
+  background: linear-gradient(135deg, #fff6be, #ffd45f);
+  color: #17151b;
+  font-size: 2.55rem;
+}
+
+#snakesGame #snakesRollBtn {
+  min-height: 72px;
+  border: 0;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #ff3cac, #2b86c5);
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 1000;
+  box-shadow: 0 14px 28px rgba(43, 134, 197, 0.28);
+  opacity: 1;
+}
+
+#snakesGame #snakesResetBtn {
+  align-self: end;
+  background: rgba(29, 24, 32, 0.08);
+  color: rgba(29, 24, 32, 0.64);
+}
+
+#snakesGame #snakesRollBtn:disabled {
+  background: rgba(29, 24, 32, 0.12);
+  color: rgba(29, 24, 32, 0.44);
+  box-shadow: none;
+}
+
 .game-rule {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -2506,6 +2547,28 @@ body::before {
   min-height: 30px;
   padding: 0 8px;
   font-size: 0.72rem;
+}
+
+#snakesGame .game-action {
+  grid-template-columns: 64px minmax(0, 1fr);
+}
+
+#snakesGame .dice-chip {
+  width: 64px;
+  height: 64px;
+  font-size: 2.25rem;
+}
+
+#snakesGame #snakesRollBtn {
+  min-height: 64px;
+  font-size: 1rem;
+}
+
+#snakesGame #snakesResetBtn {
+  grid-column: 2;
+  justify-self: end;
+  width: auto;
+  min-height: 30px;
 }
 
 .ludo-track,
