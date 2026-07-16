@@ -12,7 +12,6 @@ const state = {
   selectedAvatar: "🎧",
   lastTypingAt: 0,
   activeGame: "snakes",
-  ludo: { turn: 0, pawns: initialLudoPawns(4), winner: null, lastRoll: null },
   snakes: { turn: 0, positions: [1, 1, 1, 1], winner: null, lastRoll: null },
   mix: { bass: 40, volume: 85 },
   mixSyncTimer: null,
@@ -85,12 +84,6 @@ const queueList = $("#queueList");
 const playQueueBtn = $("#playQueueBtn");
 const promptText = $("#promptText");
 const newPromptBtn = $("#newPromptBtn");
-const ludoGame = $("#ludoGame");
-const ludoTrack = $("#ludoTrack");
-const ludoStatus = $("#ludoStatus");
-const ludoDice = $("#ludoDice");
-const ludoRollBtn = $("#ludoRollBtn");
-const ludoResetBtn = $("#ludoResetBtn");
 const snakesGame = $("#snakesGame");
 const snakesBoard = $("#snakesBoard");
 const snakesStatus = $("#snakesStatus");
@@ -115,10 +108,6 @@ const themeNames = {
   heartbreak: "💔 Heartbreak",
   anime: "✨ Anime",
 };
-
-const LUDO_SAFE_TILES = [0, 8, 13, 21, 26, 34, 39, 47];
-const LUDO_START_OFFSETS = [0, 13, 26, 39];
-const LUDO_PLAYER_COLORS = ["green", "red", "blue", "yellow"];
 
 function escapeHtml(value) {
   return String(value)
@@ -391,17 +380,8 @@ document.querySelectorAll("[data-game-tab]").forEach((button) => {
   });
 });
 
-ludoRollBtn?.addEventListener("click", async () => {
-  await rollRoomGame("ludo", ludoStatus);
-});
-
 snakesRollBtn.addEventListener("click", async () => {
   await rollRoomGame("snakes", snakesStatus);
-});
-
-ludoResetBtn?.addEventListener("click", async () => {
-  if (!confirm("Reset this Ludo round?")) return;
-  await resetRoomGame("ludo", ludoStatus);
 });
 
 snakesResetBtn.addEventListener("click", async () => {
@@ -571,13 +551,16 @@ function showPlayerLoadFallback() {
 async function loadVideoForRoom(videoId, title = "YouTube video") {
   if (state.playerReady && state.player) {
     state.suppressPlayerEventsUntil = Date.now() + 1200;
-    state.player.loadVideoById(videoId, 0);
-    state.player.playVideo?.();
+    if (state.player.cueVideoById) state.player.cueVideoById(videoId, 0);
+    else {
+      state.player.loadVideoById(videoId, 0);
+      state.player.pauseVideo?.();
+    }
   }
   await sendControl("load", 0, videoId, title);
-  if (state.room) applySnapshot(state.room, true);
+  if (state.room) applySnapshot(state.room, { force: true, cueOnly: true });
   applyDjConsole();
-  searchStatus.textContent = "Playing now for everyone. Enjoy the vibe.";
+  searchStatus.textContent = "Loaded for the room. Tap Play when everyone is ready.";
 }
 
 async function runMusicSearch(query) {
@@ -854,7 +837,6 @@ function renderMiniGames() {
     button.classList.toggle("selected", button.dataset.gameTab === state.activeGame);
   });
   promptText?.classList.add("hidden");
-  ludoGame?.classList.add("hidden");
   snakesGame.classList.remove("hidden");
   renderSnakes();
 }
@@ -898,15 +880,6 @@ function gamePlayers() {
 
 function applyGameSnapshot(games) {
   if (!games) return;
-  if (games.ludo) {
-    state.ludo = {
-      turn: Number(games.ludo.turn || 0),
-      pawns: normalizeLudoPawns(games.ludo.pawns, gamePlayers().length),
-      winner: games.ludo.winner || null,
-      lastRoll: games.ludo.lastRoll || null,
-      message: games.ludo.message || state.ludo.message || "New Ludo round. Roll a 6 to open one pawn.",
-    };
-  }
   if (games.snakes) {
     state.snakes = {
       turn: Number(games.snakes.turn || 0),
@@ -919,129 +892,14 @@ function applyGameSnapshot(games) {
 }
 
 function syncGameSlots(players) {
-  state.ludo.pawns = normalizeLudoPawns(state.ludo.pawns, players.length);
   state.snakes.positions = normalizeSlots(state.snakes.positions, players.length, 1);
-  state.ludo.turn %= players.length;
   state.snakes.turn %= players.length;
-}
-
-function initialLudoPawns(count) {
-  return Array.from({ length: count }, () => [-1, -1, -1, -1]);
-}
-
-function normalizeLudoPawns(pawns, count) {
-  const next = Array.isArray(pawns) ? pawns.slice(0, count) : [];
-  while (next.length < count) next.push([-1, -1, -1, -1]);
-  return next.map((playerPawns) => {
-    if (!Array.isArray(playerPawns)) return [-1, -1, -1, -1];
-    const normalized = playerPawns.slice(0, 4);
-    while (normalized.length < 4) normalized.push(-1);
-    return normalized;
-  });
 }
 
 function normalizeSlots(slots, count, fallback) {
   const next = slots.slice(0, count);
   while (next.length < count) next.push(fallback);
   return next;
-}
-
-function playLudoTurn(playerIndex, roll, players) {
-  if (state.ludo.winner) return { message: `${state.ludo.winner} already brought all pawns HOME. Reset for a new round.`, extraTurn: false };
-  const player = players[playerIndex];
-  const pawns = state.ludo.pawns[playerIndex];
-  const candidates = ludoMoveCandidates(playerIndex, roll);
-  if (!candidates.length) {
-    const allLocked = pawns.every((position) => position < 0);
-    const reason = allLocked && roll !== 6 ? "Need a 6 to open a pawn." : "No legal move; exact roll is needed near HOME.";
-    return { message: `${player.name} rolled ${roll}. ${reason}`, extraTurn: roll === 6 };
-  }
-  const move = chooseLudoMove(candidates);
-  pawns[move.pawnIndex] = move.to;
-  const captured = captureLudoRival(playerIndex, move.pawnIndex);
-  if (pawns.every((position) => position === 57)) {
-    state.ludo.winner = player.name;
-    return { message: `${player.name} brought all 4 pawns HOME and won Ludo.`, extraTurn: false };
-  }
-  const extra = roll === 6;
-  const action = move.from < 0 ? `opened pawn ${move.pawnIndex + 1}` : move.to === 57 ? `sent pawn ${move.pawnIndex + 1} HOME` : `moved pawn ${move.pawnIndex + 1}`;
-  const captureText = captured ? ` Captured ${captured}'s pawn.` : "";
-  return { message: `${player.name} rolled ${roll} and ${action}.${captureText}${extra ? " Roll again." : ""}`, extraTurn: extra };
-}
-
-function ludoMoveCandidates(playerIndex, roll) {
-  const pawns = state.ludo.pawns[playerIndex];
-  return pawns
-    .map((position, pawnIndex) => {
-      if (position === 57) return null;
-      if (position < 0) {
-        if (roll !== 6) return null;
-        return { pawnIndex, from: position, to: 0, opens: true, finishes: false, captures: ludoLandingCaptures(playerIndex, 0) };
-      }
-      const to = position + roll;
-      if (to > 57) return null;
-      return { pawnIndex, from: position, to, opens: false, finishes: to === 57, captures: ludoLandingCaptures(playerIndex, to) };
-    })
-    .filter(Boolean);
-}
-
-function chooseLudoMove(candidates) {
-  return candidates.slice().sort((a, b) => {
-    if (a.finishes !== b.finishes) return a.finishes ? -1 : 1;
-    if (a.captures !== b.captures) return b.captures - a.captures;
-    if (a.opens !== b.opens) return a.opens ? 1 : -1;
-    return b.to - a.to;
-  })[0];
-}
-
-function ludoLandingCaptures(playerIndex, landingProgress) {
-  if (landingProgress < 0 || landingProgress >= 52) return 0;
-  const landing = ludoBoardIndex(playerIndex, landingProgress);
-  if (LUDO_SAFE_TILES.includes(landing)) return 0;
-  return state.ludo.pawns.reduce((total, pawns, rivalIndex) => {
-    if (rivalIndex === playerIndex) return total;
-    return total + pawns.filter((position) => position >= 0 && position < 52 && ludoBoardIndex(rivalIndex, position) === landing).length;
-  }, 0);
-}
-
-function captureLudoRival(playerIndex, pawnIndex) {
-  const progress = state.ludo.pawns[playerIndex][pawnIndex];
-  if (progress < 0 || progress >= 52) return "";
-  const landing = ludoBoardIndex(playerIndex, progress);
-  if (LUDO_SAFE_TILES.includes(landing)) return "";
-  const players = gamePlayers();
-  for (let rivalIndex = 0; rivalIndex < state.ludo.pawns.length; rivalIndex += 1) {
-    if (rivalIndex === playerIndex) continue;
-    for (let rivalPawn = 0; rivalPawn < state.ludo.pawns[rivalIndex].length; rivalPawn += 1) {
-      const position = state.ludo.pawns[rivalIndex][rivalPawn];
-      if (position < 0 || position >= 52) continue;
-      if (ludoBoardIndex(rivalIndex, position) === landing) {
-        state.ludo.pawns[rivalIndex][rivalPawn] = -1;
-        return players[rivalIndex]?.name || `Player ${rivalIndex + 1}`;
-      }
-    }
-  }
-  return "";
-}
-
-function ludoBoardIndex(playerIndex, progress) {
-  return (progress + LUDO_START_OFFSETS[playerIndex]) % 52;
-}
-
-function ludoPawnPoint(playerIndex, pawnIndex, progress, path) {
-  if (progress < 0) return ludoYardPoint(playerIndex, pawnIndex);
-  if (progress === 57) return ludoFinishedPoint(playerIndex, pawnIndex);
-  if (progress >= 52) return ludoHomeLanePoint(playerIndex, progress - 51, pawnIndex);
-  const pathIndex = ludoBoardIndex(playerIndex, progress);
-  const [x, y] = path[pathIndex];
-  const offsets = [
-    [-9, -9],
-    [9, -9],
-    [-9, 9],
-    [9, 9],
-  ];
-  const [dx, dy] = offsets[pawnIndex] || [0, 0];
-  return { x: x + dx, y: y + dy };
 }
 
 function playSnakesTurn(playerIndex, roll, players) {
@@ -1065,99 +923,6 @@ function playSnakesTurn(playerIndex, roll, players) {
   }
   const extra = roll === 6;
   return { message: `${player.name} rolled ${roll}${jumpText}.${extra ? " Roll again." : ""}`, extraTurn: extra };
-}
-
-function renderLudo() {
-  const players = gamePlayers();
-  syncGameSlots(players);
-  const activePlayer = players[state.ludo.turn % players.length];
-  const isMyTurn = activePlayer.id === state.user?.id;
-  ludoDice.textContent = diceFace(state.ludo.lastRoll);
-  ludoStatus.textContent = state.ludo.message || "New Ludo round. Roll a 6 to open one pawn.";
-  if (!state.ludo.winner && !isMyTurn) {
-    ludoStatus.textContent = `${ludoStatus.textContent} Turn: ${activePlayer.name}.`;
-  }
-  ludoRollBtn.textContent = state.ludo.winner ? "Round finished" : "Your turn: Roll dice";
-  ludoRollBtn.disabled = Boolean(state.ludo.winner) || !isMyTurn;
-  ludoRollBtn.classList.toggle("hidden", !state.ludo.winner && !isMyTurn);
-  const path = ludoPathPoints();
-  const cell = 40;
-  const homes = [
-    { x: 0, y: 360, color: "#16b75f", label: "GREEN" },
-    { x: 0, y: 0, color: "#e7333f", label: "RED" },
-    { x: 360, y: 0, color: "#1d8dff", label: "BLUE" },
-    { x: 360, y: 360, color: "#ffc928", label: "YELLOW" },
-  ];
-  const homeTiles = homes
-    .map((home) => `
-      <g class="ludo-home classic">
-        <rect x="${home.x + 10}" y="${home.y + 10}" width="220" height="220" rx="26" fill="${home.color}"></rect>
-        <rect x="${home.x + 48}" y="${home.y + 48}" width="144" height="144" rx="22"></rect>
-        <circle cx="${home.x + 84}" cy="${home.y + 84}" r="24"></circle>
-        <circle cx="${home.x + 156}" cy="${home.y + 84}" r="24"></circle>
-        <circle cx="${home.x + 84}" cy="${home.y + 156}" r="24"></circle>
-        <circle cx="${home.x + 156}" cy="${home.y + 156}" r="24"></circle>
-        <text x="${home.x + 120}" y="${home.y + 128}">${home.label}</text>
-      </g>
-    `)
-    .join("");
-  const laneTiles = [
-    ...ludoLane(7, 8, 6, "green", "y"),
-    ...ludoLane(1, 7, 6, "red", "x"),
-    ...ludoLane(7, 1, 6, "blue", "y"),
-    ...ludoLane(8, 7, 6, "yellow", "x"),
-  ]
-    .map((tile) => `
-      <rect class="ludo-lane ${tile.color}" x="${tile.x * cell}" y="${tile.y * cell}" width="${cell}" height="${cell}" rx="5"></rect>
-    `)
-    .join("");
-  const pathTiles = path
-    .map(([x, y], index) => {
-      const startIndex = LUDO_START_OFFSETS.indexOf(index);
-      const isStart = startIndex >= 0;
-      const isSafe = LUDO_SAFE_TILES.includes(index);
-      const colorClass = isStart ? LUDO_PLAYER_COLORS[startIndex] : "";
-      const marker = isStart ? "●" : isSafe ? "★" : "";
-      return `
-        <g class="ludo-svg-tile ${isSafe ? "safe" : ""} ${isStart ? `start ${colorClass}` : ""}">
-          <rect x="${x - 20}" y="${y - 20}" width="40" height="40" rx="5"></rect>
-          <text x="${x}" y="${y + 5}">${marker}</text>
-        </g>
-      `;
-    })
-    .join("");
-  const tokens = players
-    .map((player, playerIndex) => {
-      return state.ludo.pawns[playerIndex]
-        .map((position, pawnIndex) => {
-          const { x, y } = ludoPawnPoint(playerIndex, pawnIndex, position, path);
-          return `
-            <g class="svg-token pawn-token" transform="translate(${x}, ${y})">
-              <path d="M0,-20 C10,-20 15,-8 8,-1 L16,15 C17,19 14,22 10,22 L-10,22 C-14,22 -17,19 -16,15 L-8,-1 C-15,-8 -10,-20 0,-20Z" fill="${player.color}"></path>
-              <text y="10">${pawnIndex + 1}</text>
-            </g>
-          `;
-        })
-        .join("");
-    })
-    .join("");
-  ludoTrack.innerHTML = `
-    <svg class="ludo-svg-board" viewBox="0 0 600 600" aria-label="Ludo board">
-      <rect class="board-bg ludo-bg" x="2" y="2" width="596" height="596" rx="24"></rect>
-      ${homeTiles}
-      ${pathTiles}
-      ${laneTiles}
-      <g class="ludo-center">
-        <polygon points="240,240 360,240 300,300"></polygon>
-        <polygon points="360,240 360,360 300,300"></polygon>
-        <polygon points="360,360 240,360 300,300"></polygon>
-        <polygon points="240,360 240,240 300,300"></polygon>
-        <circle cx="300" cy="300" r="34"></circle>
-        <text x="300" y="306">HOME</text>
-      </g>
-      ${tokens}
-    </svg>
-  `;
 }
 
 function renderSnakes() {
@@ -1256,72 +1021,6 @@ function snakeJumps() {
     95: { to: 75, type: "snake" },
     98: { to: 79, type: "snake" },
   };
-}
-
-function ludoYardPoint(playerIndex, pawnIndex) {
-  const homes = [
-    { x: 0, y: 360 },
-    { x: 0, y: 0 },
-    { x: 360, y: 0 },
-    { x: 360, y: 360 },
-  ];
-  const slots = [
-    [84, 84],
-    [156, 84],
-    [84, 156],
-    [156, 156],
-  ];
-  const home = homes[playerIndex] || homes[0];
-  const [x, y] = slots[pawnIndex] || slots[0];
-  return { x: home.x + x, y: home.y + y };
-}
-
-function ludoHomeLanePoint(playerIndex, step, pawnIndex) {
-  const clamped = Math.max(1, Math.min(6, step));
-  const lanes = [
-    [7, 14 - clamped],
-    [clamped, 7],
-    [7, clamped],
-    [14 - clamped, 7],
-  ];
-  const [cellX, cellY] = lanes[playerIndex] || lanes[0];
-  const offsets = [
-    [-7, -7],
-    [7, -7],
-    [-7, 7],
-    [7, 7],
-  ];
-  const [dx, dy] = offsets[pawnIndex] || [0, 0];
-  return { x: cellX * 40 + 20 + dx, y: cellY * 40 + 20 + dy };
-}
-
-function ludoFinishedPoint(playerIndex, pawnIndex) {
-  const offsets = [
-    [-17, -17],
-    [17, -17],
-    [-17, 17],
-    [17, 17],
-  ];
-  const [dx, dy] = offsets[pawnIndex] || [0, 0];
-  return { x: 300 + dx + (playerIndex - 1.5) * 5, y: 300 + dy + (playerIndex - 1.5) * 5 };
-}
-
-function ludoLane(startX, startY, count, color, direction = "y") {
-  return Array.from({ length: count }, (_, index) => ({
-    x: startX + (direction === "x" ? index : 0),
-    y: startY + (direction === "y" ? index : 0),
-    color,
-  }));
-}
-
-function ludoPathPoints() {
-  const cells = [
-    [6, 13], [6, 12], [6, 11], [6, 10], [6, 9], [5, 8], [4, 8], [3, 8], [2, 8], [1, 8], [0, 8], [0, 7], [0, 6],
-    [1, 6], [2, 6], [3, 6], [4, 6], [5, 6], [6, 5], [6, 4], [6, 3], [6, 2], [6, 1], [6, 0], [7, 0], [8, 0], [8, 1],
-    [8, 2], [8, 3], [8, 4], [8, 5], [9, 6], [10, 6], [11, 6], [12, 6], [13, 6], [14, 6], [14, 7], [14, 8], [13, 8], [12, 8],
-    [11, 8], [10, 8], [9, 8], [8, 9], [8, 10], [8, 11], [8, 12], [8, 13], [8, 14], [7, 14], [6, 14],
-  ];
-  return cells.map(([x, y]) => [x * 40 + 20, y * 40 + 20]);
 }
 
 function ladderSvg(from, to) {
@@ -1439,7 +1138,7 @@ function renderSearchResults(results) {
     searchStatus.textContent = "No videos found here. Try a different search or open YouTube.";
     return;
   }
-  searchStatus.textContent = `${results.length} videos found. Tap Play and everyone hears it.`;
+  searchStatus.textContent = `${results.length} videos found. Load one, then tap Play when the room is ready.`;
   results.forEach((result) => {
     const card = document.createElement("article");
     card.className = "result-card";
@@ -1447,13 +1146,13 @@ function renderSearchResults(results) {
       <img alt="" loading="lazy">
       <div><h4></h4><p>youtube.com/watch</p></div>
       <div class="result-actions">
-        <button type="button" class="primary-button load-btn">Play now</button>
+        <button type="button" class="primary-button load-btn">Load</button>
         <button type="button" class="secondary-button queue-btn">Add next</button>
       </div>
     `;
     card.querySelector("img").src = result.thumbnail;
     card.querySelector("h4").textContent = result.title;
-    card.querySelector("p").textContent = "Tap Play now. If YouTube blocks embed, choose another result.";
+    card.querySelector("p").textContent = "Load it first. If YouTube blocks embed, choose another result.";
     card.querySelector(".load-btn").addEventListener("click", () => loadVideoForRoom(result.videoId, result.title));
     card.querySelector(".queue-btn").addEventListener("click", () => addQueueItem(result));
     searchResults.appendChild(card);
@@ -1468,8 +1167,10 @@ function diceFace(value) {
   return ["🎲", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"][value || 0];
 }
 
-function applySnapshot(room, force = false) {
+function applySnapshot(room, options = false) {
   if (!state.playerReady || !room.videoId) return;
+  const force = typeof options === "boolean" ? options : Boolean(options?.force);
+  const cueOnly = typeof options === "object" && Boolean(options?.cueOnly);
   const desired = currentDesiredPosition(room);
   const currentVideo = state.player.getVideoData?.().video_id;
   const currentTime = state.player.getCurrentTime?.() || 0;
@@ -1478,7 +1179,8 @@ function applySnapshot(room, force = false) {
 
   state.suppressPlayerEventsUntil = Date.now() + 1200;
   if (needsLoad) {
-    state.player.loadVideoById(room.videoId, desired);
+    if (cueOnly && state.player.cueVideoById) state.player.cueVideoById(room.videoId, desired);
+    else state.player.loadVideoById(room.videoId, desired);
     if (room.status !== "playing") state.player.pauseVideo();
   } else if (needsSeek) {
     state.player.seekTo(desired, true);

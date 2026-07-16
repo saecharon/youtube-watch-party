@@ -1676,7 +1676,6 @@ input:focus {
   opacity: 0.74;
 }
 
-.ludo-track,
 .snakes-board {
   position: relative;
   width: min(100%, 560px);
@@ -1692,10 +1691,6 @@ input:focus {
   overflow: hidden;
 }
 
-.ludo-track {
-  aspect-ratio: 1;
-}
-
 .snakes-board {
   width: min(100%, 600px);
   aspect-ratio: 1;
@@ -1708,7 +1703,6 @@ input:focus {
     inset 0 0 0 6px rgba(71, 42, 14, 0.3);
 }
 
-.ludo-svg-board,
 .snake-svg-board {
   display: block;
   width: 100%;
@@ -1718,10 +1712,6 @@ input:focus {
 .board-bg {
   stroke: rgba(28, 24, 17, 0.34);
   stroke-width: 4;
-}
-
-.ludo-bg {
-  fill: #fff8df;
 }
 
 .snake-bg {
@@ -1739,29 +1729,6 @@ input:focus {
   stroke-width: 3;
 }
 
-.ludo-home {
-  filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.18));
-}
-
-.ludo-home rect {
-  opacity: 1;
-}
-
-.ludo-home.classic rect:nth-child(2) {
-  fill: rgba(255, 255, 255, 0.92);
-  stroke: rgba(0, 0, 0, 0.16);
-  stroke-width: 4;
-}
-
-.ludo-home circle {
-  fill: rgba(255, 255, 255, 0.94);
-  stroke: rgba(0, 0, 0, 0.22);
-  stroke-width: 4;
-}
-
-.ludo-home text,
-.ludo-center text,
-.ludo-svg-tile text,
 .snake-svg-tile text {
   fill: #17151b;
   font-size: 14px;
@@ -1770,57 +1737,6 @@ input:focus {
   paint-order: stroke;
   stroke: rgba(255, 255, 255, 0.58);
   stroke-width: 2px;
-}
-
-.ludo-center polygon:nth-child(1) {
-  fill: #1d8dff;
-}
-
-.ludo-center polygon:nth-child(2) {
-  fill: #ffc928;
-}
-
-.ludo-center polygon:nth-child(3) {
-  fill: #16b75f;
-}
-
-.ludo-center polygon:nth-child(4) {
-  fill: #e7333f;
-}
-
-.ludo-center circle {
-  fill: rgba(255, 255, 255, 0.95);
-  stroke: rgba(0, 0, 0, 0.24);
-  stroke-width: 4;
-}
-
-.ludo-lane {
-  stroke: rgba(0, 0, 0, 0.24);
-  stroke-width: 1.4;
-  shape-rendering: crispEdges;
-}
-
-.ludo-lane.red {
-  fill: #e7333f;
-}
-
-.ludo-lane.blue {
-  fill: #1d8dff;
-}
-
-.ludo-lane.green {
-  fill: #16b75f;
-  stroke: rgba(4, 94, 49, 0.56);
-}
-
-.ludo-lane.yellow {
-  fill: #ffc928;
-}
-
-.ludo-svg-tile rect {
-  fill: rgba(255, 255, 255, 0.96);
-  stroke: rgba(24, 22, 18, 0.26);
-  stroke-width: 1.4;
 }
 
 .snake-svg-tile rect {
@@ -1849,43 +1765,11 @@ input:focus {
   fill: #fff5cf;
 }
 
-.ludo-svg-tile.safe rect,
 .snake-svg-tile.ladder rect {
   fill: #ffe45f;
   stroke: rgba(124, 78, 12, 0.42);
 }
 
-.ludo-svg-tile.safe text {
-  fill: #8a5b00;
-  font-size: 18px;
-  stroke-width: 1px;
-}
-
-.ludo-svg-tile.start rect {
-  stroke-width: 3.2;
-}
-
-.ludo-svg-tile.start.green rect {
-  fill: #dff8e9;
-  stroke: #16b75f;
-}
-
-.ludo-svg-tile.start.red rect {
-  fill: #ffe1e4;
-  stroke: #e7333f;
-}
-
-.ludo-svg-tile.start.blue rect {
-  fill: #dceeff;
-  stroke: #1d8dff;
-}
-
-.ludo-svg-tile.start.yellow rect {
-  fill: #fff1b8;
-  stroke: #ffc928;
-}
-
-.ludo-svg-tile.finish rect,
 .snake-svg-tile.finish rect {
   fill: #ffcf4d;
   stroke: rgba(128, 82, 0, 0.62);
@@ -2087,9 +1971,7 @@ input:focus {
   stroke: none;
 }
 
-.ludo-track svg,
 .snakes-board svg,
-.ludo-track text,
 .snakes-board text {
   user-select: none;
   -webkit-user-select: none;
@@ -2308,7 +2190,6 @@ button:disabled {
     width: auto;
   }
 
-  .ludo-track,
   .snakes-board {
     border-width: 3px;
   }
@@ -2571,7 +2452,6 @@ body::before {
   min-height: 30px;
 }
 
-.ludo-track,
 .snakes-board {
   width: min(100%, 500px);
   border-width: 4px;

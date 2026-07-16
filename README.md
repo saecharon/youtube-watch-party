@@ -67,7 +67,7 @@ The blueprint uses Render's free plan for quick demos. See `EASY_WEBHOST.md` for
 - Shared play, pause, seek, and video changes
 - Floating reactions over the video
 - Live chat with emoji picker and simple mood reactions
-- Typing presence, badges, mini-game prompts, synced Ludo, synced Snake & Ladder, and watch history
+- Typing presence, badges, mini-game prompts, synced Snake & Ladder, and watch history
 - No external Python packages required
 
 ## Release Setup
