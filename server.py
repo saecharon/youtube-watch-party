@@ -1829,6 +1829,8 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
             self.send_error(HTTPStatus.NOT_FOUND)
             return
         content_type = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+        if target.name == "manifest.webmanifest":
+            content_type = "application/manifest+json"
         data = target.read_bytes()
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", content_type)

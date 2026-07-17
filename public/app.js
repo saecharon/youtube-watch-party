@@ -37,6 +37,7 @@ const state = {
   speechRecognition: null,
   listening: false,
   config: {},
+  installPrompt: null,
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -65,6 +66,7 @@ const profilePreviewName = $("#profilePreviewName");
 const profilePreviewStatus = $("#profilePreviewStatus");
 const homeAvatar = $("#homeAvatar");
 const homeNickname = $("#homeNickname");
+const installAppBtn = $("#installAppBtn");
 const enableNotificationsBtn = $("#enableNotificationsBtn");
 const logoutBtn = $("#logoutBtn");
 const logoutAllBtn = $("#logoutAllBtn");
@@ -144,6 +146,7 @@ const roomSharePreview = $("#roomSharePreview");
 const sharePreviewTitle = $("#sharePreviewTitle");
 const sharePreviewText = $("#sharePreviewText");
 const copyInviteBtn = $("#copyInviteBtn");
+const installRoomAppBtn = $("#installRoomAppBtn");
 const hostControls = $("#hostControls");
 const toggleRoomLockBtn = $("#toggleRoomLockBtn");
 const hostControlText = $("#hostControlText");
@@ -200,8 +203,21 @@ setTimeout(showPlayerLoadFallback, 7000);
 restoreAuthSession();
 loadAppConfig();
 renderDjConsole();
+renderInstallButtons();
 
 refreshRoomsBtn?.addEventListener("click", loadPublicRooms);
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  state.installPrompt = event;
+  renderInstallButtons();
+});
+
+window.addEventListener("appinstalled", () => {
+  state.installPrompt = null;
+  showToast("App installed", "Watch Party is now on your home screen.", "system");
+  renderInstallButtons();
+});
 
 continueEmailBtn?.addEventListener("click", () => showAuthStep("email"));
 loginEmailBtn?.addEventListener("click", () => showAuthStep("email"));
@@ -280,6 +296,8 @@ logoutBtn?.addEventListener("click", async () => {
 logoutAllBtn?.addEventListener("click", () => logoutBtn?.click());
 
 enableNotificationsBtn?.addEventListener("click", enableNotifications);
+installAppBtn?.addEventListener("click", installApp);
+installRoomAppBtn?.addEventListener("click", installApp);
 
 joinForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -554,6 +572,8 @@ function showHome() {
   joinView.classList.add("hidden");
   partyView.classList.add("hidden");
   homeView.classList.remove("hidden");
+  bottomNav?.classList.add("hidden");
+  renderInstallButtons();
   const params = new URLSearchParams(location.search);
   if (params.get("room")) roomInput.value = params.get("room");
   refreshFriends();
@@ -569,9 +589,46 @@ function enterRoom(data) {
   partyView.classList.remove("hidden");
   bottomNav?.classList.remove("hidden");
   renderRoom(data.room);
+  renderInstallButtons();
   applySnapshot(data.room);
   clearTimeout(state.pollTimer);
   pollEvents();
+}
+
+async function installApp() {
+  if (isStandaloneApp()) {
+    showToast("Already installed", "You are using the app view.", "system");
+    return;
+  }
+  if (state.installPrompt) {
+    const prompt = state.installPrompt;
+    state.installPrompt = null;
+    prompt.prompt();
+    await prompt.userChoice.catch(() => null);
+    renderInstallButtons();
+    return;
+  }
+  const isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  showToast(
+    "Install Watch Party",
+    isiOS ? "Tap Share, then Add to Home Screen." : "Use your browser menu and tap Install app.",
+    "system",
+  );
+}
+
+function isStandaloneApp() {
+  return window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
+}
+
+function renderInstallButtons() {
+  const installed = isStandaloneApp();
+  const isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const show = !installed && (state.installPrompt || isiOS);
+  [installAppBtn, installRoomAppBtn].forEach((button) => {
+    if (!button) return;
+    button.classList.toggle("hidden", !show);
+    button.textContent = isiOS && !state.installPrompt ? "Add to Home" : "Install app";
+  });
 }
 
 function setAuthSession(sessionToken, account, persist = true) {

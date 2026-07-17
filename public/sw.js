@@ -1,9 +1,67 @@
+self.__WATCH_PARTY_CACHE = "watch-party-pwa-v1";
+self.__WATCH_PARTY_ASSETS = [
+  "/",
+  "/index.html",
+  "/styles.css?v=pwa-mobile-1",
+  "/app.js?v=pwa-mobile-1",
+  "/manifest.webmanifest",
+  "/icons/icon.svg",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/privacy.html",
+  "/terms.html",
+];
+
 self.addEventListener("install", (event) => {
-  self.skipWaiting();
+  event.waitUntil(
+    caches
+      .open(self.__WATCH_PARTY_CACHE)
+      .then((cache) => cache.addAll(self.__WATCH_PARTY_ASSETS))
+      .catch(() => null)
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((key) => key !== self.__WATCH_PARTY_CACHE).map((key) => caches.delete(key))))
+      .then(() => self.clients.claim()),
+  );
+});
+
+self.addEventListener("fetch", (event) => {
+  const request = event.request;
+  const url = new URL(request.url);
+  if (request.method !== "GET" || url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith("/api/")) return;
+
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(self.__WATCH_PARTY_CACHE).then((cache) => cache.put("/", copy));
+          return response;
+        })
+        .catch(() => caches.match("/") || caches.match("/index.html")),
+    );
+    return;
+  }
+
+  event.respondWith(
+    caches.match(request).then((cached) => {
+      if (cached) return cached;
+      return fetch(request).then((response) => {
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(self.__WATCH_PARTY_CACHE).then((cache) => cache.put(request, copy));
+        }
+        return response;
+      });
+    }),
+  );
 });
 
 self.addEventListener("push", (event) => {

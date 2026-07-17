@@ -145,7 +145,7 @@ textarea {
   position: relative;
   width: min(1240px, calc(100vw - 32px));
   margin: 0 auto;
-  padding: 32px 0;
+  padding: max(32px, env(safe-area-inset-top)) 0 max(32px, env(safe-area-inset-bottom));
 }
 
 .hidden {
@@ -2742,7 +2742,7 @@ body::before {
 
 .app-shell {
   width: min(1160px, calc(100vw - 28px));
-  padding: 20px 0;
+  padding: max(20px, env(safe-area-inset-top)) 0 max(20px, env(safe-area-inset-bottom));
 }
 
 .party-view {
