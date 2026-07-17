@@ -379,7 +379,7 @@ def default_games(count: int = 1) -> dict:
             "ranking": [],
             "winner": None,
             "lastRoll": None,
-            "message": "Press Ready. Host starts Ludo when 2-4 players are ready.",
+            "message": "Press Ready. Host starts Ludo when 1-4 players are ready.",
             "updatedAt": now_ms(),
         },
         "snakes": {
@@ -453,7 +453,7 @@ def normalize_games(room: dict) -> dict:
     snakes["turn"] = int(snakes.get("turn", 0) or 0) % count
     ludo.setdefault("winner", None)
     ludo.setdefault("lastRoll", None)
-    ludo.setdefault("message", "Press Ready. Host starts Ludo when 2-4 players are ready.")
+    ludo.setdefault("message", "Press Ready. Host starts Ludo when 1-4 players are ready.")
     snakes.setdefault("winner", None)
     snakes.setdefault("lastRoll", None)
     snakes.setdefault("message", "New Snake & Ladder round. First exact 100 wins.")
@@ -1658,7 +1658,13 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
             ludo["ready"][user_id] = True
             user = room["users"][user_id]
             ludo["message"] = f"{user['name']} is ready for Ludo."
-            make_event(room, "game", {"game": "ludo", "message": ludo["message"], "by": user["name"], "snapshot": games_snapshot(room)})
+            if room.get("hostId") == user_id and players and all(ludo["ready"].get(player.get("id")) for player in players):
+                games["ludo"] = reset_ludo_round(players)
+                games["ludo"]["status"] = "active"
+                games["ludo"]["ready"] = {player.get("id", ""): True for player in players}
+                games["ludo"]["message"] = f"Ludo started with {len(players)} player{'s' if len(players) != 1 else ''}. {players[0]['name']} rolls first."
+            event_message = games["ludo"]["message"]
+            make_event(room, "game", {"game": "ludo", "message": event_message, "by": user["name"], "snapshot": games_snapshot(room)})
             make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
             snapshot = room_snapshot(room_id, room)
         self.json_response({"ok": True, "room": snapshot})
@@ -1670,8 +1676,8 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
                 self.json_response({"error": "Only the host can start Ludo."}, HTTPStatus.FORBIDDEN)
                 return
             players = room_game_players(room)[:4]
-            if len(players) < 2:
-                self.json_response({"error": "Need at least 2 players to start Ludo."}, HTTPStatus.BAD_REQUEST)
+            if len(players) < 1:
+                self.json_response({"error": "Need at least 1 player to start Ludo."}, HTTPStatus.BAD_REQUEST)
                 return
             games = normalize_games(room)
             ready = games["ludo"].get("ready", {})
@@ -1682,7 +1688,7 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
             games["ludo"] = reset_ludo_round(players)
             games["ludo"]["status"] = "active"
             games["ludo"]["ready"] = {player.get("id", ""): True for player in players}
-            games["ludo"]["message"] = f"Ludo started with {len(players)} players. {players[0]['name']} rolls first."
+            games["ludo"]["message"] = f"Ludo started with {len(players)} player{'s' if len(players) != 1 else ''}. {players[0]['name']} rolls first."
             make_event(room, "game", {"game": "ludo", "message": games["ludo"]["message"], "by": room["users"][user_id]["name"], "snapshot": games_snapshot(room)})
             make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
             snapshot = room_snapshot(room_id, room)

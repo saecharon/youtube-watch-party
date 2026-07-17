@@ -23,7 +23,7 @@ const state = {
     pendingRoll: null,
     winner: null,
     lastRoll: null,
-    message: "Press Ready. Host starts Ludo when 2-4 players are ready.",
+    message: "Press Ready. Host starts Ludo when 1-4 players are ready.",
   },
   snakes: { turn: 0, positions: [1, 1, 1, 1], winner: null, lastRoll: null },
   mix: { bass: 40, volume: 85 },
@@ -1469,7 +1469,7 @@ function applyGameSnapshot(games) {
       pendingRoll: games.ludo.pendingRoll || null,
       winner: games.ludo.winner || null,
       lastRoll: games.ludo.lastRoll || null,
-      message: games.ludo.message || state.ludo.message || "Press Ready. Host starts Ludo when 2-4 players are ready.",
+      message: games.ludo.message || state.ludo.message || "Press Ready. Host starts Ludo when 1-4 players are ready.",
     };
   }
   if (games.snakes) {
@@ -1547,11 +1547,11 @@ function renderLudo() {
   const pending = state.ludo.pendingRoll;
   const movable = new Set(pending?.playerId === state.user?.id ? pending.movable || [] : []);
   const readyCount = Object.values(state.ludo.ready || {}).filter(Boolean).length;
-  const canStart = isHost && state.ludo.status === "waiting" && players.length >= 2;
+  const canStart = isHost && state.ludo.status === "waiting" && players.length >= 1;
   const ludoPlayable = ["active", "paused"].includes(state.ludo.status);
   ludoGame.classList.toggle("your-turn", ludoPlayable && !state.ludo.winner && isMyTurn);
   ludoDice.textContent = diceFace(state.ludo.lastRoll);
-  ludoStatus.textContent = state.ludo.message || "Press Ready. Host starts Ludo when 2-4 players are ready.";
+  ludoStatus.textContent = state.ludo.message || "Press Ready. Host starts Ludo when 1-4 players are ready.";
   if (ludoPlayable && !state.ludo.winner && !isMyTurn) {
     ludoStatus.textContent = `${ludoStatus.textContent} Turn: ${activePlayer.name}.`;
   }
@@ -1566,7 +1566,7 @@ function renderLudo() {
             ? "Your Turn"
             : `${activePlayer.name}'s turn`;
   ludoTurnBadge.classList.toggle("active", ludoPlayable && !state.ludo.winner && (isMyTurn || pending?.playerId === state.user?.id));
-  if (ludoReadyText) ludoReadyText.textContent = `${readyCount}/${players.length} ready · ${players.map((player) => player.colorName).join(", ")}`;
+  if (ludoReadyText) ludoReadyText.textContent = `${readyCount}/${players.length} ready · ${players.map((player) => player.colorName).join(", ")}${players.length === 1 ? " · solo test allowed" : ""}`;
   if (ludoReadyBtn) {
     ludoReadyBtn.disabled = state.ludo.status !== "waiting" || Boolean(state.ludo.ready?.[state.user?.id]);
     ludoReadyBtn.textContent = state.ludo.ready?.[state.user?.id] ? "Ready ✓" : "Ready";
