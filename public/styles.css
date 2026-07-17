@@ -3590,6 +3590,273 @@ body.app-native button {
   font-size: 16px;
 }
 
+@media (max-width: 430px) {
+  body.app-native .party-view {
+    padding-inline: 8px;
+    padding-bottom: calc(78px + env(safe-area-inset-bottom));
+  }
+
+  body.app-native .topbar,
+  body.app-native .home-topbar {
+    margin-inline: -8px;
+    padding: max(10px, env(safe-area-inset-top)) 10px 10px;
+    border-radius: 0 0 18px 18px;
+  }
+
+  body.app-native .topbar h2,
+  body.app-native .home-topbar h1 {
+    font-size: 1.08rem;
+  }
+
+  body.app-native .room-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  body.app-native .room-actions button,
+  body.app-native .profile-chip button {
+    min-height: 36px;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    padding-inline: 6px;
+  }
+
+  body.app-native .theme-panel {
+    top: 82px;
+    margin-inline: -8px;
+    padding: 7px 8px;
+  }
+
+  body.app-native .theme-panel button {
+    min-height: 34px;
+    padding: 0 12px;
+    font-size: 0.78rem;
+  }
+
+  body.app-native .watch-layout,
+  body.app-native .main-stack,
+  body.app-native .side-panel {
+    gap: 10px;
+  }
+
+  body.app-native .player-panel,
+  body.app-native .search-panel,
+  body.app-native .queue-panel,
+  body.app-native .games-panel,
+  body.app-native .people-card,
+  body.app-native .chat-card {
+    border-radius: 18px;
+    padding: 10px;
+  }
+
+  body.app-native .player-panel {
+    padding: 7px;
+  }
+
+  body.app-native .player-panel::after {
+    display: none;
+  }
+
+  body.app-native .video-frame {
+    border-radius: 18px;
+    max-height: 28dvh;
+  }
+
+  body.app-native .video-form,
+  body.app-native .controls-row {
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  body.app-native .control-button,
+  body.app-native .primary-button,
+  body.app-native .secondary-button {
+    min-height: 42px;
+    border-radius: 14px;
+  }
+
+  body.app-native .search-panel,
+  body.app-native .queue-panel {
+    display: none;
+  }
+
+  body.app-native .chat-log {
+    min-height: 150px;
+    max-height: 32dvh;
+  }
+
+  body.app-native .chat-form {
+    bottom: calc(66px + env(safe-area-inset-bottom));
+    grid-template-columns: minmax(0, 1fr) 40px 40px;
+    border-radius: 16px;
+    padding: 6px;
+  }
+
+  body.app-native .chat-form .primary-button {
+    min-height: 40px;
+  }
+
+  body.app-native .bottom-nav:not(.hidden) {
+    right: 8px;
+    left: 8px;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    border-radius: 18px;
+    padding: 6px;
+  }
+
+  body.app-native .bottom-nav button {
+    min-height: 42px;
+    border-radius: 13px;
+  }
+
+  body.app-native .ludo-board,
+  body.app-native .snakes-board {
+    max-width: min(100%, 360px);
+    margin-inline: auto;
+  }
+}
+
+@media (max-width: 374px) {
+  body.app-native .login-view {
+    padding: 10px 10px max(18px, env(safe-area-inset-bottom));
+  }
+
+  body.app-native .auth-card {
+    min-height: calc(100dvh - 74px - env(safe-area-inset-top));
+    border-radius: 22px;
+    padding: 16px;
+  }
+
+  body.app-native .party-view {
+    padding-inline: 6px;
+  }
+
+  body.app-native .topbar {
+    gap: 7px;
+  }
+
+  body.app-native .room-meta,
+  body.app-native .status-pill,
+  body.app-native .eyebrow {
+    font-size: 0.68rem;
+  }
+
+  body.app-native .theme-panel {
+    top: 76px;
+  }
+
+  body.app-native .video-frame {
+    max-height: 24dvh;
+  }
+
+  body.app-native .player-panel,
+  body.app-native .games-panel,
+  body.app-native .people-card,
+  body.app-native .chat-card {
+    padding: 8px;
+  }
+
+  body.app-native .chat-log {
+    min-height: 126px;
+    max-height: 29dvh;
+  }
+
+  body.app-native .moods button,
+  body.app-native .emoji-picker button {
+    min-width: 44px;
+    min-height: 38px;
+    padding: 0 10px;
+  }
+
+  body.app-native .game-rule {
+    display: none;
+  }
+}
+
+@media (min-width: 431px) and (max-width: 620px) {
+  body.app-native .party-view {
+    padding-inline: 12px;
+  }
+
+  body.app-native .video-frame {
+    max-height: 31dvh;
+  }
+
+  body.app-native .chat-log {
+    min-height: 190px;
+    max-height: 34dvh;
+  }
+
+  body.app-native .search-panel,
+  body.app-native .queue-panel,
+  body.app-native .games-panel,
+  body.app-native .people-card {
+    padding: 14px;
+  }
+}
+
+@media (max-height: 720px) {
+  body.app-native .theme-panel {
+    position: static;
+  }
+
+  body.app-native .video-frame {
+    max-height: 23dvh;
+  }
+
+  body.app-native .chat-log {
+    min-height: 118px;
+    max-height: 26dvh;
+  }
+
+  body.app-native .people-card {
+    display: none;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  body.app-native .party-view {
+    padding: 0 8px calc(58px + env(safe-area-inset-bottom));
+  }
+
+  body.app-native .topbar,
+  body.app-native .theme-panel,
+  body.app-native .people-card,
+  body.app-native .search-panel,
+  body.app-native .queue-panel {
+    display: none;
+  }
+
+  body.app-native .watch-layout {
+    gap: 8px;
+  }
+
+  body.app-native .player-panel,
+  body.app-native .chat-card {
+    padding: 8px;
+  }
+
+  body.app-native .video-frame {
+    max-height: 42dvh;
+  }
+
+  body.app-native .chat-log {
+    min-height: 96px;
+    max-height: 30dvh;
+  }
+
+  body.app-native .chat-form {
+    position: static;
+  }
+
+  body.app-native .bottom-nav:not(.hidden) {
+    padding: 5px;
+  }
+
+  body.app-native .bottom-nav button {
+    min-height: 34px;
+  }
+}
+
 @media (max-width: 620px) {
   body:not(.app-native) .app-footer {
     display: none;

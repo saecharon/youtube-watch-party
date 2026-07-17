@@ -14,6 +14,18 @@
       "i.ytimg.com"
     ]
   },
+  "ios": {
+    "contentInset": "automatic",
+    "scrollEnabled": true,
+    "allowsLinkPreview": false,
+    "preferredContentMode": "mobile"
+  },
+  "android": {
+    "backgroundColor": "#090b12",
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  },
   "plugins": {
     "Keyboard": {
       "resize": "body",
