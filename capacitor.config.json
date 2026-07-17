@@ -1,0 +1,35 @@
+{
+  "appId": "com.watchparty.rooms",
+  "appName": "Watch Party Rooms",
+  "webDir": "public",
+  "server": {
+    "url": "https://youtube-watch-party-8com.onrender.com",
+    "cleartext": false,
+    "allowNavigation": [
+      "youtube-watch-party-8com.onrender.com",
+      "www.youtube.com",
+      "youtube.com",
+      "*.youtube.com",
+      "*.googlevideo.com",
+      "i.ytimg.com"
+    ]
+  },
+  "plugins": {
+    "Keyboard": {
+      "resize": "body",
+      "style": "dark",
+      "resizeOnFullScreen": true
+    },
+    "StatusBar": {
+      "style": "dark",
+      "backgroundColor": "#090b12",
+      "overlaysWebView": false
+    },
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "backgroundColor": "#090b12",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false
+    }
+  }
+}

@@ -7,7 +7,7 @@ Set these environment variables in production:
 ```text
 HOST=0.0.0.0
 PORT=8080
-APP_NAME=YouTube Watch Party
+APP_NAME=Watch Party Rooms
 SUPPORT_EMAIL=your-support-email
 BUSINESS_NAME=your-business-name
 STRIPE_PAYMENT_LINK=your-stripe-payment-link
@@ -23,6 +23,19 @@ YOUTUBE_API_KEY=your-youtube-data-api-key
 5. Join one room from two devices, play a YouTube video, send chat, and roll both games.
 6. Confirm the Subscribe link appears when `STRIPE_PAYMENT_LINK` is set.
 7. Replace local JSON storage with Postgres/Redis before large public traffic.
+
+## Native App Build
+
+Use the native app name `Watch Party Rooms` for iOS and Android.
+
+```bash
+npm install
+npm run native:add:ios
+npm run native:add:android
+npm run native:sync
+```
+
+Before store upload, complete `native/APP_STORE_REVIEW.md`, add real support/legal URLs, and confirm mobile subscription billing rules.
 
 ## Current Production Foundation
 

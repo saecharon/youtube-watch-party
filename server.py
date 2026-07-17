@@ -27,7 +27,7 @@ MAX_USERS = 5
 ROOM_TTL_SECONDS = 60 * 60 * 8
 YOUTUBE_SEARCH_TIMEOUT = 6
 DEFAULT_VIDEO = "M7lc1UVf-VE"
-APP_NAME = os.environ.get("APP_NAME", "YouTube Watch Party")
+APP_NAME = os.environ.get("APP_NAME", "Watch Party Rooms")
 SUPPORT_EMAIL = os.environ.get("SUPPORT_EMAIL", "support@example.com")
 BUSINESS_NAME = os.environ.get("BUSINESS_NAME", APP_NAME)
 STRIPE_PAYMENT_LINK = os.environ.get("STRIPE_PAYMENT_LINK", "")
@@ -1859,7 +1859,7 @@ def main() -> None:
     host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "8080"))
     server = ThreadingHTTPServer((host, port), WatchPartyHandler)
-    print(f"YouTube Watch Party running at http://{host}:{port}")
+    print(f"{APP_NAME} running at http://{host}:{port}")
     server.serve_forever()
 
 

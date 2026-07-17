@@ -1,0 +1,25 @@
+{
+  "name": "watch-party-rooms",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Private synced watch party rooms with chat, games, and friend invites.",
+  "scripts": {
+    "native:doctor": "npx cap doctor",
+    "native:add:ios": "npx cap add ios",
+    "native:add:android": "npx cap add android",
+    "native:sync": "npx cap sync",
+    "native:open:ios": "npx cap open ios",
+    "native:open:android": "npx cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "latest",
+    "@capacitor/app": "latest",
+    "@capacitor/core": "latest",
+    "@capacitor/ios": "latest",
+    "@capacitor/keyboard": "latest",
+    "@capacitor/status-bar": "latest"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "latest"
+  }
+}

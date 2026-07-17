@@ -1,4 +1,4 @@
-# YouTube Watch Party
+# Watch Party Rooms
 
 A watch-party app for up to 5 people per room. Everyone joins the same room, watches the same YouTube video, chats, reacts, searches music, and plays synced mini-games together.
 
@@ -40,6 +40,26 @@ Room state is saved locally in `data/rooms.json`, so rooms survive a server rest
 docker build -t youtube-watch-party .
 docker run -p 8080:8080 youtube-watch-party
 ```
+
+## iOS and Android
+
+The app includes Capacitor config for native iOS and Android wrappers using the safer public app name `Watch Party Rooms`.
+
+```bash
+npm install
+npm run native:add:ios
+npm run native:add:android
+npm run native:sync
+```
+
+Open the native projects:
+
+```bash
+npm run native:open:ios
+npm run native:open:android
+```
+
+Before submitting to Apple or Google, read `native/APP_STORE_REVIEW.md`.
 
 ## Easy Web Host
 
@@ -91,6 +111,7 @@ The blueprint uses Render's free plan for quick demos. See `EASY_WEBHOST.md` for
 - Synced room games
 - Docker packaging
 - Procfile and Render blueprint
+- PWA install support plus Capacitor config for iOS and Android wrappers
 - Health check at `/api/health`
 - Privacy and terms pages
 - Stripe payment link support through `STRIPE_PAYMENT_LINK`
@@ -104,3 +125,4 @@ The blueprint uses Render's free plan for quick demos. See `EASY_WEBHOST.md` for
 - Payment provider and subscription price.
 - Production database choice, preferably Postgres plus Redis for live rooms.
 - YouTube Data API key and policy confirmation for search and paid usage.
+- Native app store assets, screenshots, support URL, app review notes, and platform billing decisions.
