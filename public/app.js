@@ -200,6 +200,7 @@ initYouTubePlayer();
 setTimeout(initYouTubePlayer, 500);
 setTimeout(showPlayerLoadFallback, 7000);
 
+setupAppShellMode();
 restoreAuthSession();
 loadAppConfig();
 renderDjConsole();
@@ -567,6 +568,7 @@ function showAuthStep(step) {
   joinView.classList.remove("hidden");
   homeView.classList.add("hidden");
   partyView.classList.add("hidden");
+  setAppView("login");
   [authWelcome, emailForm, profileForm].forEach((element) => element?.classList.add("hidden"));
   if (step === "email") emailForm.classList.remove("hidden");
   else if (step === "profile") profileForm.classList.remove("hidden");
@@ -579,6 +581,7 @@ function showHome() {
   partyView.classList.add("hidden");
   homeView.classList.remove("hidden");
   bottomNav?.classList.add("hidden");
+  setAppView("home");
   renderInstallButtons();
   const params = new URLSearchParams(location.search);
   if (params.get("room")) roomInput.value = params.get("room");
@@ -594,11 +597,26 @@ function enterRoom(data) {
   homeView.classList.add("hidden");
   partyView.classList.remove("hidden");
   bottomNav?.classList.remove("hidden");
+  setAppView("room");
   renderRoom(data.room);
   renderInstallButtons();
   applySnapshot(data.room);
   clearTimeout(state.pollTimer);
   pollEvents();
+}
+
+function setupAppShellMode() {
+  const isNative = Boolean(window.Capacitor?.isNativePlatform?.() || window.Capacitor?.getPlatform?.() === "ios" || window.Capacitor?.getPlatform?.() === "android");
+  const isStandalone = window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone;
+  document.body.classList.toggle("app-native", Boolean(isNative || isStandalone));
+  document.body.classList.toggle("app-browser", !isNative && !isStandalone);
+  setAppView("login");
+}
+
+function setAppView(view) {
+  document.body.classList.toggle("view-login", view === "login");
+  document.body.classList.toggle("view-home", view === "home");
+  document.body.classList.toggle("view-room", view === "room");
 }
 
 async function installApp() {

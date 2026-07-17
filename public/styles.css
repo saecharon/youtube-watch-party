@@ -3226,3 +3226,279 @@ body::before {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* Native app shell: removes website chrome when installed or wrapped by Capacitor. */
+body.app-native {
+  min-height: 100dvh;
+  overflow-x: hidden;
+  background:
+    radial-gradient(circle at 50% -12%, rgba(255, 60, 172, 0.22), transparent 18rem),
+    linear-gradient(180deg, #080a13 0%, #0d1020 100%);
+  -webkit-tap-highlight-color: transparent;
+}
+
+body.app-native::before {
+  opacity: 0.18;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.5), transparent 45%);
+}
+
+body.app-native::after {
+  display: none;
+}
+
+body.app-native .app-shell {
+  width: 100vw;
+  min-height: 100dvh;
+  margin: 0;
+  padding: env(safe-area-inset-top) 0 0;
+}
+
+body.app-native.view-login .app-shell::before {
+  content: "Watch Party";
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(8, 10, 19, 0.86);
+  backdrop-filter: blur(18px);
+  color: #f8fbff;
+  font-weight: 1000;
+  letter-spacing: 0.02em;
+}
+
+body.app-native .login-view,
+body.app-native .home-view,
+body.app-native .party-view {
+  width: 100%;
+  min-height: calc(100dvh - env(safe-area-inset-top));
+}
+
+body.app-native .login-view {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: start;
+  gap: 0;
+  padding: 14px 14px max(24px, env(safe-area-inset-bottom));
+}
+
+body.app-native .login-copy {
+  display: none;
+}
+
+body.app-native .login-card,
+body.app-native .home-card,
+body.app-native .player-panel,
+body.app-native .search-panel,
+body.app-native .queue-panel,
+body.app-native .prompt-card,
+body.app-native .people-card,
+body.app-native .chat-card {
+  border-radius: 22px;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(16px);
+}
+
+body.app-native .auth-card {
+  align-self: stretch;
+  min-height: calc(100dvh - 92px - env(safe-area-inset-top));
+  align-content: center;
+  border-radius: 28px;
+  padding: 22px;
+}
+
+body.app-native .home-view {
+  padding: 0 12px max(24px, env(safe-area-inset-bottom));
+}
+
+body.app-native .home-topbar,
+body.app-native .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 35;
+  margin: 0 -12px 12px;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0 0 26px 26px;
+  padding: max(12px, env(safe-area-inset-top)) 14px 14px;
+  background:
+    linear-gradient(135deg, rgba(255, 60, 172, 0.18), rgba(0, 212, 255, 0.1)),
+    rgba(8, 10, 19, 0.92);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(20px);
+}
+
+body.app-native .topbar {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 10px;
+}
+
+body.app-native .topbar h2,
+body.app-native .home-topbar h1 {
+  margin: 2px 0 0;
+  font-size: 1.3rem;
+  line-height: 1.1;
+}
+
+body.app-native .brand-mark {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+}
+
+body.app-native .profile-chip,
+body.app-native .room-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  gap: 8px;
+}
+
+body.app-native .profile-chip > span,
+body.app-native .profile-chip > strong {
+  grid-column: span 1;
+}
+
+body.app-native .profile-chip button,
+body.app-native .room-actions button {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+}
+
+body.app-native .home-grid,
+body.app-native .watch-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+body.app-native .welcome-banner,
+body.app-native .subscription-card,
+body.app-native .room-share-preview,
+body.app-native .launch-strip span,
+body.app-native .app-footer {
+  display: none;
+}
+
+body.app-native .launch-strip {
+  margin: 0 12px 12px;
+  border-radius: 18px;
+  padding: 10px 12px;
+}
+
+body.app-native .party-view {
+  padding: 0 10px calc(86px + env(safe-area-inset-bottom));
+}
+
+body.app-native .theme-panel {
+  position: sticky;
+  top: 92px;
+  z-index: 24;
+  display: flex;
+  gap: 8px;
+  margin: 0 -10px 10px;
+  padding: 8px 10px;
+  overflow-x: auto;
+  background: rgba(8, 10, 19, 0.78);
+  backdrop-filter: blur(14px);
+  scrollbar-width: none;
+}
+
+body.app-native .theme-panel::-webkit-scrollbar {
+  display: none;
+}
+
+body.app-native .theme-panel button {
+  flex: 0 0 auto;
+  min-height: 38px;
+  white-space: nowrap;
+}
+
+body.app-native .video-frame {
+  border-radius: 24px;
+}
+
+body.app-native .video-form,
+body.app-native .search-form,
+body.app-native .chat-form,
+body.app-native .controls-row {
+  grid-template-columns: 1fr;
+}
+
+body.app-native .control-button,
+body.app-native .primary-button,
+body.app-native .secondary-button {
+  min-height: 48px;
+  border-radius: 16px;
+}
+
+body.app-native .quick-music {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+body.app-native .quick-music::-webkit-scrollbar {
+  display: none;
+}
+
+body.app-native .quick-music button {
+  flex: 0 0 auto;
+  min-width: 116px;
+}
+
+body.app-native .side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+body.app-native .chat-card {
+  order: -1;
+}
+
+body.app-native .chat-log {
+  max-height: 42dvh;
+}
+
+body.app-native .bottom-nav:not(.hidden) {
+  position: fixed;
+  right: 10px;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  left: 10px;
+  z-index: 60;
+  display: grid;
+  border-radius: 22px;
+  padding: 8px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.44);
+}
+
+body.app-native .bottom-nav button {
+  min-height: 46px;
+  border-radius: 16px;
+  font-size: 0.76rem;
+}
+
+body.app-native .toast-dock {
+  right: 12px;
+  bottom: calc(84px + env(safe-area-inset-bottom));
+  left: 12px;
+}
+
+body.app-native input,
+body.app-native textarea,
+body.app-native button {
+  font-size: 16px;
+}
+
+@media (max-width: 620px) {
+  body:not(.app-native) .app-footer {
+    display: none;
+  }
+}
