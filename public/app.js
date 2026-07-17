@@ -151,6 +151,8 @@ const hostControls = $("#hostControls");
 const toggleRoomLockBtn = $("#toggleRoomLockBtn");
 const hostControlText = $("#hostControlText");
 const bottomNav = $("#bottomNav");
+const mainStack = $(".main-stack");
+const playerPanel = $(".player-panel");
 
 const themeNames = {
   "late-night": "🌙 Late Night",
@@ -598,6 +600,7 @@ function enterRoom(data) {
   partyView.classList.remove("hidden");
   bottomNav?.classList.remove("hidden");
   setAppView("room");
+  arrangeNativeRoomLayout();
   renderRoom(data.room);
   renderInstallButtons();
   applySnapshot(data.room);
@@ -611,12 +614,21 @@ function setupAppShellMode() {
   document.body.classList.toggle("app-native", Boolean(isNative || isStandalone));
   document.body.classList.toggle("app-browser", !isNative && !isStandalone);
   setAppView("login");
+  arrangeNativeRoomLayout();
 }
 
 function setAppView(view) {
   document.body.classList.toggle("view-login", view === "login");
   document.body.classList.toggle("view-home", view === "home");
   document.body.classList.toggle("view-room", view === "room");
+}
+
+function arrangeNativeRoomLayout() {
+  if (!document.body.classList.contains("app-native") || !mainStack || !playerPanel || !chatLog) return;
+  const chatCard = chatLog.closest(".chat-card");
+  if (!chatCard || chatCard.parentElement === mainStack) return;
+  mainStack.insertBefore(chatCard, playerPanel.nextElementSibling);
+  chatCard.classList.add("native-room-chat");
 }
 
 async function installApp() {
