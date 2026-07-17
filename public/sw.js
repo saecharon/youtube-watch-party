@@ -1,9 +1,9 @@
-self.__WATCH_PARTY_CACHE = "watch-party-pwa-v5";
+self.__WATCH_PARTY_CACHE = "watch-party-pwa-v6";
 self.__WATCH_PARTY_ASSETS = [
   "/",
   "/index.html",
-  "/styles.css?v=ludo-solo-1",
-  "/app.js?v=ludo-solo-1",
+  "/styles.css?v=app-update-1",
+  "/app.js?v=app-update-1",
   "/manifest.webmanifest",
   "/icons/icon.svg",
   "/icons/icon-192.png",
@@ -62,6 +62,10 @@ self.addEventListener("fetch", (event) => {
       });
     }),
   );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("push", (event) => {

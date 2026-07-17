@@ -203,6 +203,7 @@ setTimeout(initYouTubePlayer, 500);
 setTimeout(showPlayerLoadFallback, 7000);
 
 setupAppShellMode();
+registerAppUpdater();
 restoreAuthSession();
 loadAppConfig();
 renderDjConsole();
@@ -830,6 +831,33 @@ async function loadAppConfig() {
     if (enableNotificationsBtn) enableNotificationsBtn.textContent = config.pushNotificationsReady ? "Notify me" : "Local alerts";
   } catch {
     // The room still works without release config.
+  }
+}
+
+async function registerAppUpdater() {
+  if (!("serviceWorker" in navigator)) return;
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
+  try {
+    const registration = await navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" });
+    if (registration.waiting) registration.waiting.postMessage({ type: "SKIP_WAITING" });
+    registration.addEventListener("updatefound", () => {
+      const worker = registration.installing;
+      if (!worker) return;
+      worker.addEventListener("statechange", () => {
+        if (worker.state === "installed" && navigator.serviceWorker.controller) {
+          worker.postMessage({ type: "SKIP_WAITING" });
+          showToast("App updated", "Refreshing to the latest version.", "system");
+        }
+      });
+    });
+    registration.update?.().catch(() => null);
+  } catch {
+    // Local previews and some embedded browsers can block service workers.
   }
 }
 
