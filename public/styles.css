@@ -2138,11 +2138,32 @@ input:focus {
 .ludo-token.movable {
   cursor: pointer;
   animation: tokenReady 760ms ease-in-out infinite alternate;
+  pointer-events: all;
 }
 
 .ludo-token.movable path {
   stroke: #fff8a8;
   stroke-width: 7;
+}
+
+.ludo-hit-target {
+  fill: rgba(255, 248, 168, 0.02);
+  stroke: rgba(255, 248, 168, 0.5);
+  stroke-width: 2;
+}
+
+.ludo-board.selecting-pawn {
+  animation: boardNudge 420ms ease-in-out 2;
+}
+
+@keyframes boardNudge {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 rgba(255, 248, 168, 0));
+  }
+  50% {
+    filter: drop-shadow(0 0 24px rgba(255, 248, 168, 0.75));
+  }
 }
 
 @keyframes tokenReady {

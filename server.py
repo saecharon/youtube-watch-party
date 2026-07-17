@@ -350,8 +350,7 @@ def queue_snapshot(room: dict) -> list[dict]:
 
 
 def room_game_players(room: dict) -> list[dict]:
-    cutoff = now_ms() - 15000
-    users = [user for user in room["users"].values() if user.get("lastSeen", 0) >= cutoff][:4]
+    users = list(room["users"].values())[:4]
     if not users:
         users = [{"id": "", "name": "Player 1", "avatar": "🎧"}]
     return users
@@ -444,11 +443,9 @@ def normalize_games(room: dict) -> dict:
     ludo["rollHistory"] = (ludo.get("rollHistory") if isinstance(ludo.get("rollHistory"), list) else [])[-120:]
     ludo["sixStreak"] = normalize_slots(ludo.get("sixStreak"), ludo_count, 0)
     ludo["ranking"] = ludo.get("ranking") if isinstance(ludo.get("ranking"), list) else []
-    if ludo["status"] == "active":
-        online_ids = {player.get("id") for player in active_users(room) if player.get("online")}
-        if not any(player_id in online_ids for player_id in ludo_players):
-            ludo["status"] = "paused"
-            ludo["message"] = "Ludo paused. Waiting for players to reconnect."
+    if ludo["status"] == "paused" and ludo_players:
+        ludo["status"] = "active"
+        ludo["message"] = ludo.get("message") or "Ludo reconnected. Continue from the current turn."
     ludo["pawns"] = normalize_ludo_pawns(ludo.get("pawns"), count)
     ludo["pawns"] = normalize_ludo_pawns(ludo.get("pawns"), ludo_count)
     snakes["positions"] = normalize_slots(snakes.get("positions"), count, 1)
@@ -714,6 +711,8 @@ def ludo_player_map(room: dict, game_state: dict) -> list[dict]:
         user = room["users"].get(player_id)
         if user:
             players.append(user)
+    if not players:
+        players = room_game_players(room)[:4]
     return players
 
 

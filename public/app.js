@@ -536,6 +536,12 @@ snakesRollBtn.addEventListener("click", async () => {
 });
 
 ludoRollBtn.addEventListener("click", async () => {
+  if (state.ludo.pendingRoll?.playerId === state.user?.id) {
+    ludoStatus.textContent = "Tap one of the glowing pawns on the board to move.";
+    ludoBoard?.classList.add("selecting-pawn");
+    setTimeout(() => ludoBoard?.classList.remove("selecting-pawn"), 900);
+    return;
+  }
   await rollRoomGame("ludo", ludoStatus);
 });
 
@@ -1512,10 +1518,11 @@ function renderLudo() {
   const movable = new Set(pending?.playerId === state.user?.id ? pending.movable || [] : []);
   const readyCount = Object.values(state.ludo.ready || {}).filter(Boolean).length;
   const canStart = isHost && state.ludo.status === "waiting" && players.length >= 2;
-  ludoGame.classList.toggle("your-turn", state.ludo.status === "active" && !state.ludo.winner && isMyTurn);
+  const ludoPlayable = ["active", "paused"].includes(state.ludo.status);
+  ludoGame.classList.toggle("your-turn", ludoPlayable && !state.ludo.winner && isMyTurn);
   ludoDice.textContent = diceFace(state.ludo.lastRoll);
   ludoStatus.textContent = state.ludo.message || "Press Ready. Host starts Ludo when 2-4 players are ready.";
-  if (state.ludo.status === "active" && !state.ludo.winner && !isMyTurn) {
+  if (ludoPlayable && !state.ludo.winner && !isMyTurn) {
     ludoStatus.textContent = `${ludoStatus.textContent} Turn: ${activePlayer.name}.`;
   }
   ludoTurnBadge.textContent =
@@ -1528,7 +1535,7 @@ function renderLudo() {
           : isMyTurn
             ? "Your Turn"
             : `${activePlayer.name}'s turn`;
-  ludoTurnBadge.classList.toggle("active", state.ludo.status === "active" && !state.ludo.winner && (isMyTurn || pending?.playerId === state.user?.id));
+  ludoTurnBadge.classList.toggle("active", ludoPlayable && !state.ludo.winner && (isMyTurn || pending?.playerId === state.user?.id));
   if (ludoReadyText) ludoReadyText.textContent = `${readyCount}/${players.length} ready · ${players.map((player) => player.colorName).join(", ")}`;
   if (ludoReadyBtn) {
     ludoReadyBtn.disabled = state.ludo.status !== "waiting" || Boolean(state.ludo.ready?.[state.user?.id]);
@@ -1538,9 +1545,10 @@ function renderLudo() {
     ludoStartBtn.disabled = !canStart;
     ludoStartBtn.classList.toggle("hidden", !isHost && state.ludo.status !== "waiting");
   }
-  ludoRollBtn.textContent = pending?.playerId === state.user?.id ? "Select pawn" : state.ludo.winner ? "Round finished" : "Roll dice";
-  ludoRollBtn.disabled = state.ludo.status !== "active" || Boolean(state.ludo.winner) || !isMyTurn || Boolean(pending);
-  ludoRollBtn.classList.toggle("hidden", state.ludo.status === "active" && !state.ludo.winner && !isMyTurn && !pending);
+  const pendingForMe = pending?.playerId === state.user?.id;
+  ludoRollBtn.textContent = pendingForMe ? "Tap glowing pawn" : state.ludo.winner ? "Round finished" : "Roll dice";
+  ludoRollBtn.disabled = !ludoPlayable || Boolean(state.ludo.winner) || (!isMyTurn && !pendingForMe) || (Boolean(pending) && !pendingForMe);
+  ludoRollBtn.classList.toggle("hidden", ludoPlayable && !state.ludo.winner && !isMyTurn && !pendingForMe);
 
   const cell = 40;
   const path = ludoPathPoints();
@@ -1582,6 +1590,7 @@ function renderLudo() {
       const canMove = movable.has(pawnIndex);
       return `
         <g class="svg-token ludo-token ${active ? "active" : ""} ${canMove ? "movable" : ""}" data-pawn="${pawnIndex}" transform="translate(${x} ${y})">
+          ${canMove ? '<circle class="ludo-hit-target" cx="0" cy="2" r="32"></circle>' : ""}
           <path d="M0,-20 C11,-20 17,-9 9,-1 L17,16 C18,21 14,24 9,24 L-9,24 C-14,24 -18,21 -17,16 L-9,-1 C-17,-9 -11,-20 0,-20Z" fill="${player.color}"></path>
           <text y="9">${pawnIndex + 1}</text>
         </g>
