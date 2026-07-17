@@ -36,6 +36,7 @@ const state = {
   pendingImage: null,
   speechRecognition: null,
   listening: false,
+  config: {},
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -64,7 +65,9 @@ const profilePreviewName = $("#profilePreviewName");
 const profilePreviewStatus = $("#profilePreviewStatus");
 const homeAvatar = $("#homeAvatar");
 const homeNickname = $("#homeNickname");
+const enableNotificationsBtn = $("#enableNotificationsBtn");
 const logoutBtn = $("#logoutBtn");
+const logoutAllBtn = $("#logoutAllBtn");
 const joinForm = $("#joinForm");
 const createRoomBtn = $("#createRoomBtn");
 const joinError = $("#joinError");
@@ -101,6 +104,8 @@ const peopleList = $("#peopleList");
 const roomFriendList = $("#roomFriendList");
 const friendList = $("#friendList");
 const friendInviteList = $("#friendInviteList");
+const friendRequestList = $("#friendRequestList");
+const profileSummary = $("#profileSummary");
 const queueList = $("#queueList");
 const playQueueBtn = $("#playQueueBtn");
 const promptText = $("#promptText");
@@ -135,6 +140,14 @@ const playerOverlay = $("#playerOverlay");
 const reactionLayer = $("#reactionLayer");
 const subscribeLink = $("#subscribeLink");
 const toastDock = $("#toastDock");
+const roomSharePreview = $("#roomSharePreview");
+const sharePreviewTitle = $("#sharePreviewTitle");
+const sharePreviewText = $("#sharePreviewText");
+const copyInviteBtn = $("#copyInviteBtn");
+const hostControls = $("#hostControls");
+const toggleRoomLockBtn = $("#toggleRoomLockBtn");
+const hostControlText = $("#hostControlText");
+const bottomNav = $("#bottomNav");
 
 const themeNames = {
   "late-night": "🌙 Late Night",
@@ -264,6 +277,10 @@ logoutBtn?.addEventListener("click", async () => {
   showAuthStep("welcome");
 });
 
+logoutAllBtn?.addEventListener("click", () => logoutBtn?.click());
+
+enableNotificationsBtn?.addEventListener("click", enableNotifications);
+
 joinForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   joinError.textContent = "";
@@ -356,6 +373,34 @@ copyLinkBtn.addEventListener("click", async () => {
   }, 1200);
 });
 
+copyInviteBtn?.addEventListener("click", async () => {
+  if (!state.room) return;
+  const host = state.room.users.find((user) => user.id === state.room.hostId);
+  const text = `${host?.name || "A friend"} invited you to Watch Party room ${state.room.roomId}: ${location.origin}${location.pathname}?room=${encodeURIComponent(state.room.roomId)}`;
+  await navigator.clipboard.writeText(text);
+  copyInviteBtn.textContent = "Invite copied";
+  setTimeout(() => {
+    copyInviteBtn.textContent = "Copy invite";
+  }, 1400);
+});
+
+toggleRoomLockBtn?.addEventListener("click", async () => {
+  if (!state.room) return;
+  try {
+    const data = await api("/api/host/lock", { ...authBody(), locked: !state.room.locked });
+    state.room = data.room;
+    renderRoom(data.room);
+  } catch (error) {
+    appendSystem(error.message);
+  }
+});
+
+bottomNav?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-scroll-target]");
+  if (!button) return;
+  document.querySelector(button.dataset.scrollTarget)?.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
 claimHostBtn.addEventListener("click", async () => {
   try {
     const data = await api("/api/host/claim", authBody());
@@ -372,6 +417,7 @@ leaveBtn.addEventListener("click", async () => {
   state.user = null;
   clearTimeout(state.pollTimer);
   history.replaceState(null, "", location.pathname);
+  bottomNav?.classList.add("hidden");
   showHome();
 });
 
@@ -521,6 +567,7 @@ function enterRoom(data) {
   joinView.classList.add("hidden");
   homeView.classList.add("hidden");
   partyView.classList.remove("hidden");
+  bottomNav?.classList.remove("hidden");
   renderRoom(data.room);
   applySnapshot(data.room);
   clearTimeout(state.pollTimer);
@@ -539,6 +586,7 @@ function hydrateHomeProfile() {
   const profile = state.profile || {};
   homeAvatar.textContent = profile.avatar || "🎧";
   homeNickname.textContent = profile.nickname ? `@${profile.nickname}` : "@profile";
+  if (profileSummary) profileSummary.textContent = `${profile.nickname || "Your profile"} · ${profile.plan || "free"} plan · email stays private`;
   if (nameInput) nameInput.value = profile.displayName || profile.nickname || "";
   if (emailInput) emailInput.value = profile.email || "";
   if (vibeInput) vibeInput.value = "Ready";
@@ -575,6 +623,26 @@ function renderHomeFriends() {
       friendInviteList.appendChild(button);
     });
   }
+  const requests = profile.friendRequests || [];
+  if (friendRequestList) {
+    friendRequestList.innerHTML = "";
+    if (!requests.length) {
+      friendRequestList.textContent = "No friend requests.";
+      friendRequestList.classList.add("empty-note");
+    } else {
+      friendRequestList.classList.remove("empty-note");
+      requests.slice().reverse().forEach((request) => {
+        const row = document.createElement("div");
+        row.className = "friend-row request-row";
+        row.innerHTML = `<span></span><strong></strong><div class="request-actions"><button type="button" class="secondary-button accept-btn">Accept</button><button type="button" class="ghost-button reject-btn">Reject</button></div>`;
+        row.querySelector("span").textContent = request.fromAvatar || "🎧";
+        row.querySelector("strong").textContent = `${request.fromName || "Someone"} wants to be friends`;
+        row.querySelector(".accept-btn").addEventListener("click", () => respondFriendRequest(request.id, "accept"));
+        row.querySelector(".reject-btn").addEventListener("click", () => respondFriendRequest(request.id, "reject"));
+        friendRequestList.appendChild(row);
+      });
+    }
+  }
   const friends = profile.friends || [];
   friendList.innerHTML = "";
   if (!friends.length) {
@@ -592,6 +660,17 @@ function renderHomeFriends() {
     row.querySelector("small").textContent = friend.lastRoomId ? `Last room ${friend.lastRoomId}` : "Ready for invites";
     friendList.appendChild(row);
   });
+}
+
+async function respondFriendRequest(requestId, action) {
+  try {
+    const data = await api("/api/friends/respond", { sessionToken: state.auth?.sessionToken, requestId, action });
+    state.profile = data.account;
+    hydrateHomeProfile();
+    showToast(action === "accept" ? "Friend added" : "Request removed", "Your friends list is updated.", "system");
+  } catch (error) {
+    showToast("Friend request", error.message, "system");
+  }
 }
 
 function renderProfilePreview() {
@@ -646,6 +725,7 @@ async function loadAppConfig() {
   try {
     const response = await fetch("/api/config");
     const config = await response.json();
+    state.config = config;
     document.title = config.appName || document.title;
     if (config.paymentsEnabled && config.paymentLink) {
       subscribeLink.href = config.paymentLink;
@@ -654,9 +734,55 @@ async function loadAppConfig() {
     if (config.officialYoutubeSearch) {
       searchStatus.textContent = "Official YouTube search is active. Search or tap a mood to play for everyone.";
     }
+    if (enableNotificationsBtn) enableNotificationsBtn.textContent = config.pushNotificationsReady ? "Notify me" : "Local alerts";
   } catch {
     // The room still works without release config.
   }
+}
+
+async function enableNotifications() {
+  if (!("Notification" in window)) {
+    showToast("Notifications", "This browser does not support notifications.", "system");
+    return;
+  }
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") {
+    showToast("Notifications", "Permission was not granted.", "system");
+    return;
+  }
+  let subscription = null;
+  try {
+    if ("serviceWorker" in navigator) {
+      const registration = await navigator.serviceWorker.register("/sw.js");
+      if (state.config?.vapidPublicKey && registration.pushManager) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(state.config.vapidPublicKey),
+        });
+        subscription = subscription.toJSON ? subscription.toJSON() : subscription;
+      } else {
+        subscription = { endpoint: `local:${location.origin}`, keys: {}, registeredAt: Date.now() };
+      }
+      registration.showNotification?.("Watch Party notifications on", { body: "Chat, invites, and game turns can alert you.", tag: "watch-party-ready" });
+    }
+  } catch {
+    // Browsers can block service workers in preview; normal in local testing.
+  }
+  try {
+    const data = await api("/api/notifications/subscribe", { sessionToken: state.auth?.sessionToken, subscription });
+    state.profile = data.account || state.profile;
+    enableNotificationsBtn.textContent = data.pushReady ? "Notifications on" : "Local alerts on";
+    showToast("Notifications on", data.pushReady ? "Push is ready." : "Local alerts are on. Add VAPID keys later for closed-app push.", "system");
+  } catch (error) {
+    showToast("Notifications", error.message, "system");
+  }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
 }
 
 async function loadPublicRooms() {
@@ -821,12 +947,14 @@ function handleEvent(event) {
     appendChat(event.payload.name, event.payload.text, event.payload.avatar, event.payload.image);
     if (event.payload.name && event.payload.userId !== state.user?.id) {
       showToast(`${event.payload.avatar || "💬"} ${event.payload.name}`, event.payload.text || "sent a photo", "chat");
+      notifyBrowser(`${event.payload.name} in room ${state.room?.roomId || ""}`, event.payload.text || "sent a photo");
     }
     playNotice("chat");
   }
   if (event.type === "system") {
     appendSystem(event.payload.message);
     showToast("Room update", event.payload.message, "system");
+    notifyBrowser("Watch Party", event.payload.message);
     playNotice("join");
   }
   if (event.type === "queue") appendSystem(event.payload.message);
@@ -858,6 +986,18 @@ function handleEvent(event) {
     applySnapshot(state.room);
     playNotice(payload.action === "load" ? "load" : "sync");
     if (payload.userId !== state.user.id) appendSystem(`${payload.name} ${describeControl(payload.action)}.`);
+  }
+}
+
+function notifyBrowser(title, body) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  if (document.visibilityState === "visible") return;
+  try {
+    navigator.serviceWorker?.ready
+      ?.then((registration) => registration.showNotification(title, { body, tag: "watch-party" }))
+      .catch(() => new Notification(title, { body }));
+  } catch {
+    // Notification delivery is best effort.
   }
 }
 
@@ -926,11 +1066,17 @@ function renderRoom(room) {
   peopleCount.textContent = `${room.users.length}/5`;
   const host = room.users.find((user) => user.id === room.hostId);
   roomMeta.textContent = `${themeNames[room.theme] || "🔥 Party"} · Host: ${host?.name || "Open"}`;
+  if (sharePreviewTitle) sharePreviewTitle.textContent = `Room ${room.roomId}`;
+  if (sharePreviewText) sharePreviewText.textContent = `${host?.name || "Host"} · ${room.users.length}/5 people · ${room.locked ? "Locked" : "Open"} private room`;
   if (claimHostBtn) {
     const isHost = room.hostId === state.user?.id;
     claimHostBtn.textContent = !room.hostId ? "Become host" : isHost ? "You are host" : "Host locked";
     claimHostBtn.disabled = Boolean(room.hostId && !isHost);
   }
+  const isHost = room.hostId === state.user?.id;
+  hostControls?.classList.toggle("hidden", !isHost);
+  if (toggleRoomLockBtn) toggleRoomLockBtn.textContent = room.locked ? "Unlock room" : "Lock room";
+  if (hostControlText) hostControlText.textContent = room.locked ? "Only current members can stay." : "New joins are allowed.";
   document.body.className = `theme-${room.theme || "party"}`;
   renderThemes(room.theme);
   renderPeople(room);
@@ -966,20 +1112,25 @@ function renderPeople(room) {
       <div class="badge-row">${badges}</div>
       <button type="button" class="friend-action-btn hidden">Add friend</button>
       <button type="button" class="host-transfer-btn hidden">Make host</button>
+      <button type="button" class="remove-person-btn hidden">Remove</button>
     `;
     person.querySelector(".person-avatar").textContent = user.avatar || "🎧";
     person.querySelector(".person-name").textContent = `${user.id === room.hostId ? "Host · " : ""}${label}`;
     person.querySelector(".person-vibe").textContent = `${user.online ? "online" : "away"} · ${user.vibe || "Ready"}`;
     const transferBtn = person.querySelector(".host-transfer-btn");
     const friendBtn = person.querySelector(".friend-action-btn");
+    const removeBtn = person.querySelector(".remove-person-btn");
     const isFriend = (state.profile?.friends || []).some((friend) => friend.accountId === user.accountId);
     if (user.id !== state.user?.id && !isFriend) {
       friendBtn.classList.remove("hidden");
+      friendBtn.textContent = "Request";
       friendBtn.addEventListener("click", () => addFriend(user.id));
     }
     if (currentUserIsHost && user.id !== state.user?.id) {
       transferBtn.classList.remove("hidden");
       transferBtn.addEventListener("click", () => transferHost(user.id));
+      removeBtn.classList.remove("hidden");
+      removeBtn.addEventListener("click", () => removeFromRoom(user.id));
     }
     peopleList.appendChild(person);
   });
@@ -1012,7 +1163,7 @@ async function addFriend(targetUserId) {
     state.profile = data.account || state.profile;
     state.room = data.room;
     renderRoom(data.room);
-    showToast("Friend added", "You can invite them directly from rooms now.", "system");
+    showToast("Request sent", "They can accept it from their home screen.", "system");
   } catch (error) {
     appendSystem(error.message);
   }
@@ -1032,6 +1183,16 @@ async function inviteFriend(targetAccountId) {
 async function transferHost(targetUserId) {
   try {
     const data = await api("/api/host/transfer", { ...authBody(), targetUserId });
+    state.room = data.room;
+    renderRoom(data.room);
+  } catch (error) {
+    appendSystem(error.message);
+  }
+}
+
+async function removeFromRoom(targetUserId) {
+  try {
+    const data = await api("/api/host/remove", { ...authBody(), targetUserId });
     state.room = data.room;
     renderRoom(data.room);
   } catch (error) {

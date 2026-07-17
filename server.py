@@ -33,6 +33,8 @@ BUSINESS_NAME = os.environ.get("BUSINESS_NAME", APP_NAME)
 STRIPE_PAYMENT_LINK = os.environ.get("STRIPE_PAYMENT_LINK", "")
 YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY", "")
 AUTH_SECRET = os.environ.get("AUTH_SECRET", APP_NAME)
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
 OTP_TTL_MS = 10 * 60 * 1000
 SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000
 RATE_WINDOW_MS = 60 * 1000
@@ -117,14 +119,20 @@ def ensure_account(email: str) -> dict:
             "createdAt": now_ms(),
             "sessions": [],
             "friends": [],
+            "friendRequests": [],
             "roomInvites": [],
+            "pushSubscriptions": [],
+            "plan": "free",
             "notificationPreferences": {"sounds": True, "browser": False},
             "soundPreferences": {"volume": 85},
         },
     )
     account.setdefault("sessions", [])
     account.setdefault("friends", [])
+    account.setdefault("friendRequests", [])
     account.setdefault("roomInvites", [])
+    account.setdefault("pushSubscriptions", [])
+    account.setdefault("plan", "free")
     account.setdefault("rateLimits", {})
     account["lastSeen"] = now_ms()
     return account
@@ -142,7 +150,9 @@ def public_account(account: dict) -> dict:
         "profileComplete": bool(nickname),
         "lastSeenAt": account.get("lastSeen", 0),
         "friends": public_friends(account),
+        "friendRequests": public_friend_requests(account),
         "roomInvites": public_room_invites(account),
+        "plan": account.get("plan", "free"),
         "notificationPreferences": account.get("notificationPreferences", {"sounds": True, "browser": False}),
         "soundPreferences": account.get("soundPreferences", {"volume": 85}),
     }
@@ -180,6 +190,24 @@ def public_room_invites(account: dict) -> list[dict]:
         }
         for invite in account["roomInvites"]
     ]
+
+
+def public_friend_requests(account: dict) -> list[dict]:
+    requests = account.get("friendRequests", [])[-30:]
+    account["friendRequests"] = requests
+    rows = []
+    for request in requests:
+        from_account = account_by_id(str(request.get("fromAccountId", "")))
+        rows.append(
+            {
+                "id": request.get("id", ""),
+                "fromAccountId": request.get("fromAccountId", ""),
+                "fromName": request.get("fromName") or (from_account or {}).get("nickname") or "Someone",
+                "fromAvatar": request.get("fromAvatar") or (from_account or {}).get("avatar") or "🎧",
+                "at": request.get("at", 0),
+            }
+        )
+    return rows
 
 
 def account_by_id(account_id: str) -> dict | None:
@@ -479,6 +507,7 @@ def room_snapshot(room_id: str, room: dict) -> dict:
         "updatedAt": room["state"]["updatedAt"],
         "seq": room["seq"],
         "hostId": room.get("hostId"),
+        "locked": bool(room.get("locked")),
         "theme": room.get("theme", "party"),
         "mix": room.get("mix", DEFAULT_MIX.copy()),
         "queue": queue_snapshot(room),
@@ -505,6 +534,7 @@ def get_or_create_room(room_id: str | None = None) -> tuple[str, dict]:
             "typing": {},
             "seq": 0,
             "hostId": None,
+            "locked": False,
             "theme": "party",
             "mix": DEFAULT_MIX.copy(),
             "prompt": {"text": PROMPTS[0], "at": now_ms()},
@@ -770,6 +800,9 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
                     "paymentsEnabled": bool(STRIPE_PAYMENT_LINK),
                     "paymentLink": STRIPE_PAYMENT_LINK,
                     "officialYoutubeSearch": bool(YOUTUBE_API_KEY),
+                    "storageProvider": "postgres-ready" if DATABASE_URL else "local-json",
+                    "pushNotificationsReady": bool(VAPID_PUBLIC_KEY),
+                    "vapidPublicKey": VAPID_PUBLIC_KEY,
                 }
             )
             return
@@ -862,6 +895,12 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
         if path == "/api/friends":
             self.handle_friends(data)
             return
+        if path == "/api/friends/respond":
+            self.handle_friend_respond(data)
+            return
+        if path == "/api/notifications/subscribe":
+            self.handle_notification_subscribe(data)
+            return
 
         room_id, user_id = self.require_member(data)
         if not room_id:
@@ -926,6 +965,12 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/host/transfer":
             self.handle_host_transfer(room_id, user_id, data)
+            return
+        if path == "/api/host/lock":
+            self.handle_host_lock(room_id, user_id, data)
+            return
+        if path == "/api/host/remove":
+            self.handle_host_remove(room_id, user_id, data)
             return
 
         self.send_error(HTTPStatus.NOT_FOUND)
@@ -1064,6 +1109,9 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
                 if not room:
                     self.json_response({"error": "Room not found. Ask for the latest code or create a new room."}, HTTPStatus.NOT_FOUND)
                     return
+                if room.get("locked"):
+                    self.json_response({"error": "This room is locked by the host."}, HTTPStatus.FORBIDDEN)
+                    return
             if len(room["users"]) >= MAX_USERS:
                 self.json_response({"error": "This room already has 5 people."}, HTTPStatus.CONFLICT)
                 return
@@ -1122,15 +1170,70 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
                 return
             account.setdefault("friends", [])
             target_account.setdefault("friends", [])
-            if target_account["id"] not in account["friends"]:
-                account["friends"].append(target_account["id"])
-            if account["id"] not in target_account["friends"]:
-                target_account["friends"].append(account["id"])
+            if target_account["id"] in account["friends"]:
+                self.json_response({"error": "You are already friends."}, HTTPStatus.CONFLICT)
+                return
+            target_account.setdefault("friendRequests", [])
+            existing = any(request.get("fromAccountId") == account["id"] for request in target_account["friendRequests"])
+            if not existing:
+                target_account["friendRequests"].append(
+                    {
+                        "id": secrets.token_urlsafe(8),
+                        "fromAccountId": account["id"],
+                        "fromName": user.get("name", "Friend"),
+                        "fromAvatar": user.get("avatar", "🎧"),
+                        "at": now_ms(),
+                    }
+                )
+                target_account["friendRequests"] = target_account["friendRequests"][-30:]
             save_accounts()
-            make_event(room, "system", {"message": f"{user['name']} and {target_user['name']} are friends now."})
+            make_event(room, "system", {"message": f"{user['name']} sent {target_user['name']} a friend request."})
             make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
             snapshot = room_snapshot(room_id, room)
         self.json_response({"ok": True, "room": snapshot, "account": public_account(account)})
+
+    def handle_friend_respond(self, data: dict) -> None:
+        token = str(data.get("sessionToken", ""))
+        request_id = str(data.get("requestId", ""))
+        action = str(data.get("action", "")).lower()
+        with lock:
+            account = account_by_session(token)
+            if not account:
+                self.json_response({"error": "Session expired. Please log in again."}, HTTPStatus.UNAUTHORIZED)
+                return
+            request = next((item for item in account.get("friendRequests", []) if item.get("id") == request_id), None)
+            if not request:
+                self.json_response({"error": "Friend request not found."}, HTTPStatus.NOT_FOUND)
+                return
+            account["friendRequests"] = [item for item in account.get("friendRequests", []) if item.get("id") != request_id]
+            from_account = account_by_id(str(request.get("fromAccountId", "")))
+            if action == "accept" and from_account:
+                account.setdefault("friends", [])
+                from_account.setdefault("friends", [])
+                if from_account["id"] not in account["friends"]:
+                    account["friends"].append(from_account["id"])
+                if account["id"] not in from_account["friends"]:
+                    from_account["friends"].append(account["id"])
+            save_accounts()
+            self.json_response({"ok": True, "account": public_account(account)})
+
+    def handle_notification_subscribe(self, data: dict) -> None:
+        token = str(data.get("sessionToken", ""))
+        subscription = data.get("subscription")
+        with lock:
+            account = account_by_session(token)
+            if not account:
+                self.json_response({"error": "Session expired. Please log in again."}, HTTPStatus.UNAUTHORIZED)
+                return
+            account.setdefault("notificationPreferences", {})["browser"] = True
+            if isinstance(subscription, dict):
+                account.setdefault("pushSubscriptions", [])
+                endpoint = str(subscription.get("endpoint", ""))
+                account["pushSubscriptions"] = [item for item in account["pushSubscriptions"] if item.get("endpoint") != endpoint]
+                account["pushSubscriptions"].append(subscription)
+                account["pushSubscriptions"] = account["pushSubscriptions"][-5:]
+            save_accounts()
+            self.json_response({"ok": True, "account": public_account(account), "pushReady": bool(VAPID_PUBLIC_KEY)})
 
     def handle_friend_invite(self, room_id: str, user_id: str, data: dict) -> None:
         target_account_id = str(data.get("targetAccountId", ""))
@@ -1658,6 +1761,42 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
             user = room["users"][target_id]
             award_badges(user, "DJ")
             make_event(room, "system", {"message": f"{user['name']} is hosting now."})
+            make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+            snapshot = room_snapshot(room_id, room)
+        self.json_response({"ok": True, "room": snapshot})
+
+    def handle_host_lock(self, room_id: str, user_id: str, data: dict) -> None:
+        locked = bool(data.get("locked"))
+        with lock:
+            room = rooms[room_id]
+            if room.get("hostId") != user_id:
+                self.json_response({"error": "Only the host can lock this room."}, HTTPStatus.FORBIDDEN)
+                return
+            room["locked"] = locked
+            user = room["users"][user_id]
+            message = f"{user['name']} {'locked' if locked else 'unlocked'} the room."
+            make_event(room, "system", {"message": message})
+            make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+            snapshot = room_snapshot(room_id, room)
+        self.json_response({"ok": True, "room": snapshot})
+
+    def handle_host_remove(self, room_id: str, user_id: str, data: dict) -> None:
+        target_id = str(data.get("targetUserId", ""))
+        with lock:
+            room = rooms[room_id]
+            if room.get("hostId") != user_id:
+                self.json_response({"error": "Only the host can remove people."}, HTTPStatus.FORBIDDEN)
+                return
+            if target_id == user_id:
+                self.json_response({"error": "Host cannot remove themselves."}, HTTPStatus.BAD_REQUEST)
+                return
+            target = room["users"].get(target_id)
+            if not target:
+                self.json_response({"error": "That person is not in this room."}, HTTPStatus.NOT_FOUND)
+                return
+            del room["users"][target_id]
+            message = f"{target.get('name', 'Someone')} was removed by the host."
+            make_event(room, "system", {"message": message})
             make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
             snapshot = room_snapshot(room_id, room)
         self.json_response({"ok": True, "room": snapshot})

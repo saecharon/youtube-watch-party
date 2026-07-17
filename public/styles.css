@@ -539,6 +539,44 @@ textarea {
   grid-column: 1 / -1;
 }
 
+.profile-card,
+.subscription-card {
+  padding: 18px;
+}
+
+.profile-summary {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.05);
+  line-height: 1.4;
+}
+
+.plan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.plan-grid div {
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.plan-grid strong,
+.plan-grid span {
+  display: block;
+}
+
+.plan-grid span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
 .check-row {
   display: flex;
   align-items: center;
@@ -605,10 +643,44 @@ textarea {
   color: var(--muted);
 }
 
+.request-row {
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+}
+
+.request-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.request-actions button {
+  min-height: 30px;
+  padding: 0 9px;
+  font-size: 0.74rem;
+}
+
 .room-friend-row button {
   min-height: 30px;
   padding: 0 10px;
   font-size: 0.76rem;
+}
+
+.room-share-preview,
+.host-controls {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(18, 21, 31, 0.76);
+}
+
+.room-share-preview p,
+.host-controls span {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .welcome-banner h2 {
@@ -1565,7 +1637,8 @@ input:focus {
 }
 
 .host-transfer-btn,
-.friend-action-btn {
+.friend-action-btn,
+.remove-person-btn {
   grid-column: 3;
   min-height: 30px;
   border: 1px solid rgba(0, 212, 255, 0.34);
@@ -1588,6 +1661,36 @@ input:focus {
   border-color: rgba(124, 255, 178, 0.3);
   color: #eafff3;
   background: rgba(124, 255, 178, 0.1);
+}
+
+.remove-person-btn {
+  grid-row: 3;
+  border-color: rgba(255, 95, 109, 0.34);
+  color: #ffe8eb;
+  background: rgba(255, 95, 109, 0.12);
+}
+
+.bottom-nav {
+  position: sticky;
+  bottom: 10px;
+  z-index: 20;
+  display: none;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  padding: 7px;
+  background: rgba(9, 11, 18, 0.92);
+  backdrop-filter: blur(16px);
+}
+
+.bottom-nav button {
+  min-height: 38px;
+  border-radius: 8px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 0.78rem;
+  font-weight: 900;
 }
 
 .badge-row span {
@@ -3064,6 +3167,20 @@ body::before {
 
   .profile-chip {
     justify-content: space-between;
+  }
+
+  .plan-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .room-share-preview,
+  .host-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .bottom-nav:not(.hidden) {
+    display: grid;
   }
 
   .watch-layout {

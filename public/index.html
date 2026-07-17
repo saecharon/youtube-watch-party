@@ -4,7 +4,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>YouTube Watch Party</title>
-    <link rel="stylesheet" href="/styles.css?v=privacy-rooms-1">
+    <meta name="description" content="Create a private YouTube watch party room with live chat, games, and friend invites.">
+    <meta property="og:title" content="Join my YouTube Watch Party">
+    <meta property="og:description" content="Private room, synced YouTube, live chat, and room games.">
+    <meta property="og:type" content="website">
+    <link rel="stylesheet" href="/styles.css?v=release-foundation-1">
   </head>
   <body class="theme-party">
     <main class="app-shell">
@@ -106,6 +110,7 @@
           <div class="profile-chip">
             <span id="homeAvatar">🎧</span>
             <strong id="homeNickname">@guest</strong>
+            <button id="enableNotificationsBtn" type="button" class="secondary-button">Notify me</button>
             <button id="logoutBtn" type="button" class="ghost-button">Logout</button>
           </div>
         </header>
@@ -148,7 +153,28 @@
               <h2>Direct invites</h2>
             </div>
             <div id="friendInviteList" class="friend-list empty-note">No friend invites yet.</div>
+            <div id="friendRequestList" class="friend-list empty-note">No friend requests.</div>
             <div id="friendList" class="friend-list empty-note">Add friends from a room to invite them later.</div>
+          </section>
+
+          <section class="login-card home-card profile-card">
+            <div class="login-card-head">
+              <span class="eyebrow">Profile</span>
+              <h2>Privacy and account</h2>
+            </div>
+            <div id="profileSummary" class="profile-summary">Your email stays private. Only chat name and avatar show in rooms.</div>
+            <button id="logoutAllBtn" type="button" class="ghost-button">Logout this device</button>
+          </section>
+
+          <section class="login-card home-card subscription-card">
+            <div class="login-card-head">
+              <span class="eyebrow">Plan</span>
+              <h2>Subscription ready</h2>
+            </div>
+            <div class="plan-grid">
+              <div><strong>Free</strong><span>2 friends, chat, watch party</span></div>
+              <div><strong>Premium</strong><span>5 seats, games, direct invites, history</span></div>
+            </div>
           </section>
         </section>
       </section>
@@ -174,6 +200,20 @@
           <span>Synced YouTube playback</span>
           <span>Live chat and reactions</span>
           <a id="subscribeLink" class="subscribe-link hidden" href="#" target="_blank" rel="noreferrer">Subscribe</a>
+        </section>
+
+        <section id="roomSharePreview" class="room-share-preview">
+          <div>
+            <span class="eyebrow">Invite card</span>
+            <strong id="sharePreviewTitle">Room ready</strong>
+            <p id="sharePreviewText">Share this private room with friends.</p>
+          </div>
+          <button id="copyInviteBtn" type="button" class="secondary-button">Copy invite</button>
+        </section>
+
+        <section id="hostControls" class="host-controls hidden">
+          <button id="toggleRoomLockBtn" type="button" class="secondary-button">Lock room</button>
+          <span id="hostControlText">Host controls active</span>
         </section>
 
         <section class="theme-panel">
@@ -400,6 +440,12 @@
         </section>
       </section>
       <div id="toastDock" class="toast-dock" aria-live="polite" aria-atomic="false"></div>
+      <nav id="bottomNav" class="bottom-nav hidden" aria-label="App navigation">
+        <button type="button" data-scroll-target=".player-panel">Watch</button>
+        <button type="button" data-scroll-target=".chat-card">Chat</button>
+        <button type="button" data-scroll-target=".games-panel">Games</button>
+        <button type="button" data-scroll-target=".people-card">Squad</button>
+      </nav>
       <footer class="app-footer">
         <span>Live rooms</span>
         <a href="/privacy.html">Privacy</a>
@@ -408,6 +454,6 @@
     </main>
 
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script src="/app.js?v=privacy-rooms-1"></script>
+    <script src="/app.js?v=release-foundation-1"></script>
   </body>
 </html>
