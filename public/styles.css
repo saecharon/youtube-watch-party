@@ -503,7 +503,7 @@ textarea {
 
 .home-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   align-items: stretch;
 }
@@ -528,6 +528,87 @@ textarea {
   background:
     radial-gradient(circle at 10% 10%, rgba(255, 255, 255, 0.2), transparent 18rem),
     var(--hot-gradient);
+}
+
+.room-action-card,
+.friends-card {
+  padding: 18px;
+}
+
+.friends-card {
+  grid-column: 1 / -1;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 10px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.check-row input {
+  width: 18px;
+  height: 18px;
+  accent-color: #00d4ff;
+}
+
+.friend-list,
+.room-friend-list {
+  display: grid;
+  gap: 8px;
+}
+
+.friend-list + .friend-list {
+  margin-top: 10px;
+}
+
+.friend-row,
+.room-friend-row {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--text);
+  text-align: left;
+}
+
+.friend-row span,
+.room-friend-row span {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--cool-gradient);
+}
+
+.friend-row strong,
+.friend-row small,
+.room-friend-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.friend-row small {
+  grid-column: 2 / -1;
+  color: var(--muted);
+}
+
+.room-friend-row button {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 0.76rem;
 }
 
 .welcome-banner h2 {
@@ -1483,10 +1564,9 @@ input:focus {
   gap: 5px;
 }
 
-.host-transfer-btn {
+.host-transfer-btn,
+.friend-action-btn {
   grid-column: 3;
-  grid-row: 1 / span 3;
-  align-self: center;
   min-height: 30px;
   border: 1px solid rgba(0, 212, 255, 0.34);
   border-radius: 8px;
@@ -1496,6 +1576,18 @@ input:focus {
   font-size: 0.72rem;
   font-weight: 900;
   cursor: pointer;
+}
+
+.host-transfer-btn {
+  grid-row: 1;
+  align-self: center;
+}
+
+.friend-action-btn {
+  grid-row: 2;
+  border-color: rgba(124, 255, 178, 0.3);
+  color: #eafff3;
+  background: rgba(124, 255, 178, 0.1);
 }
 
 .badge-row span {

@@ -50,6 +50,7 @@ const continueEmailBtn = $("#continueEmailBtn");
 const loginEmailBtn = $("#loginEmailBtn");
 const emailForm = $("#emailForm");
 const authEmailInput = $("#authEmailInput");
+const stayLoggedInInput = $("#stayLoggedInInput");
 const emailError = $("#emailError");
 const backToWelcomeBtn = $("#backToWelcomeBtn");
 const profileForm = $("#profileForm");
@@ -65,6 +66,7 @@ const homeAvatar = $("#homeAvatar");
 const homeNickname = $("#homeNickname");
 const logoutBtn = $("#logoutBtn");
 const joinForm = $("#joinForm");
+const createRoomBtn = $("#createRoomBtn");
 const joinError = $("#joinError");
 const nameInput = $("#nameInput");
 const emailInput = $("#emailInput");
@@ -96,6 +98,9 @@ const volumeValue = $("#volumeValue");
 const mixQualityLabel = $("#mixQualityLabel");
 const peopleCount = $("#peopleCount");
 const peopleList = $("#peopleList");
+const roomFriendList = $("#roomFriendList");
+const friendList = $("#friendList");
+const friendInviteList = $("#friendInviteList");
 const queueList = $("#queueList");
 const playQueueBtn = $("#playQueueBtn");
 const promptText = $("#promptText");
@@ -203,7 +208,7 @@ emailForm?.addEventListener("submit", async (event) => {
   const email = authEmailInput.value.trim();
   try {
     const data = await api("/api/auth/public-login", { email });
-    setAuthSession(data.sessionToken, data.account);
+    setAuthSession(data.sessionToken, data.account, stayLoggedInInput?.checked !== false);
     if (data.account.profileComplete) showHome();
     else showAuthStep("profile");
   } catch (error) {
@@ -266,7 +271,19 @@ joinForm?.addEventListener("submit", async (event) => {
   const roomId = roomInput.value.trim() || params.get("room") || "";
   try {
     if (!state.auth?.sessionToken) throw new Error("Please log in first.");
-    const data = await api("/api/join", { authSessionToken: state.auth.sessionToken, roomId });
+    if (!roomId) throw new Error("Enter a room code or tap Create Room.");
+    const data = await api("/api/join", { authSessionToken: state.auth.sessionToken, roomId, action: "join" });
+    enterRoom(data);
+  } catch (error) {
+    joinError.textContent = error.message;
+  }
+});
+
+createRoomBtn?.addEventListener("click", async () => {
+  joinError.textContent = "";
+  try {
+    if (!state.auth?.sessionToken) throw new Error("Please log in first.");
+    const data = await api("/api/join", { authSessionToken: state.auth.sessionToken, action: "create" });
     enterRoom(data);
   } catch (error) {
     joinError.textContent = error.message;
@@ -493,6 +510,7 @@ function showHome() {
   homeView.classList.remove("hidden");
   const params = new URLSearchParams(location.search);
   if (params.get("room")) roomInput.value = params.get("room");
+  refreshFriends();
 }
 
 function enterRoom(data) {
@@ -509,10 +527,11 @@ function enterRoom(data) {
   pollEvents();
 }
 
-function setAuthSession(sessionToken, account) {
+function setAuthSession(sessionToken, account, persist = true) {
   state.auth = { sessionToken };
   state.profile = account;
-  localStorage.setItem("watchPartySession", sessionToken);
+  if (persist) localStorage.setItem("watchPartySession", sessionToken);
+  else localStorage.removeItem("watchPartySession");
   hydrateHomeProfile();
 }
 
@@ -529,6 +548,50 @@ function hydrateHomeProfile() {
       button.classList.toggle("selected", button.dataset.avatar === profile.avatar);
     });
   }
+  renderHomeFriends();
+}
+
+function renderHomeFriends() {
+  if (!friendList || !friendInviteList) return;
+  const profile = state.profile || {};
+  const invites = profile.roomInvites || [];
+  friendInviteList.innerHTML = "";
+  if (!invites.length) {
+    friendInviteList.textContent = "No friend invites yet.";
+    friendInviteList.classList.add("empty-note");
+  } else {
+    friendInviteList.classList.remove("empty-note");
+    invites.slice().reverse().forEach((invite) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "friend-row";
+      button.innerHTML = `<span>${invite.fromAvatar || "🎧"}</span><strong></strong><small></small>`;
+      button.querySelector("strong").textContent = `${invite.fromName || "Friend"} invited you`;
+      button.querySelector("small").textContent = `Join room ${invite.roomId}`;
+      button.addEventListener("click", () => {
+        roomInput.value = invite.roomId;
+        roomInput.focus();
+      });
+      friendInviteList.appendChild(button);
+    });
+  }
+  const friends = profile.friends || [];
+  friendList.innerHTML = "";
+  if (!friends.length) {
+    friendList.textContent = "Add friends from a room to invite them later.";
+    friendList.classList.add("empty-note");
+    return;
+  }
+  friendList.classList.remove("empty-note");
+  friends.forEach((friend) => {
+    const row = document.createElement("div");
+    row.className = "friend-row";
+    row.innerHTML = `<span></span><strong></strong><small></small>`;
+    row.querySelector("span").textContent = friend.avatar || "🎧";
+    row.querySelector("strong").textContent = friend.nickname || "Friend";
+    row.querySelector("small").textContent = friend.lastRoomId ? `Last room ${friend.lastRoomId}` : "Ready for invites";
+    friendList.appendChild(row);
+  });
 }
 
 function renderProfilePreview() {
@@ -557,6 +620,18 @@ async function restoreAuthSession() {
   } catch {
     localStorage.removeItem("watchPartySession");
     showAuthStep("email");
+  }
+}
+
+async function refreshFriends() {
+  if (!state.auth?.sessionToken) return;
+  try {
+    const data = await api("/api/friends", { sessionToken: state.auth.sessionToken });
+    state.profile = data.account;
+    hydrateHomeProfile();
+    renderHomeFriends();
+  } catch {
+    renderHomeFriends();
   }
 }
 
@@ -878,6 +953,7 @@ function renderThemes(activeTheme) {
 function renderPeople(room) {
   peopleList.innerHTML = "";
   const currentUserIsHost = room.hostId === state.user?.id;
+  renderRoomFriends();
   room.users.forEach((user) => {
     const person = document.createElement("div");
     person.className = "person-pill";
@@ -888,18 +964,69 @@ function renderPeople(room) {
       <span class="person-name"></span>
       <span class="person-vibe"></span>
       <div class="badge-row">${badges}</div>
+      <button type="button" class="friend-action-btn hidden">Add friend</button>
       <button type="button" class="host-transfer-btn hidden">Make host</button>
     `;
     person.querySelector(".person-avatar").textContent = user.avatar || "🎧";
     person.querySelector(".person-name").textContent = `${user.id === room.hostId ? "Host · " : ""}${label}`;
     person.querySelector(".person-vibe").textContent = `${user.online ? "online" : "away"} · ${user.vibe || "Ready"}`;
     const transferBtn = person.querySelector(".host-transfer-btn");
+    const friendBtn = person.querySelector(".friend-action-btn");
+    const isFriend = (state.profile?.friends || []).some((friend) => friend.accountId === user.accountId);
+    if (user.id !== state.user?.id && !isFriend) {
+      friendBtn.classList.remove("hidden");
+      friendBtn.addEventListener("click", () => addFriend(user.id));
+    }
     if (currentUserIsHost && user.id !== state.user?.id) {
       transferBtn.classList.remove("hidden");
       transferBtn.addEventListener("click", () => transferHost(user.id));
     }
     peopleList.appendChild(person);
   });
+}
+
+function renderRoomFriends() {
+  if (!roomFriendList) return;
+  const friends = state.profile?.friends || [];
+  roomFriendList.innerHTML = "";
+  if (!friends.length) {
+    roomFriendList.textContent = "Add friends from this room, then invite them directly next time.";
+    roomFriendList.classList.add("empty-note");
+    return;
+  }
+  roomFriendList.classList.remove("empty-note");
+  friends.forEach((friend) => {
+    const row = document.createElement("div");
+    row.className = "room-friend-row";
+    row.innerHTML = `<span></span><strong></strong><button type="button" class="secondary-button">Invite</button>`;
+    row.querySelector("span").textContent = friend.avatar || "🎧";
+    row.querySelector("strong").textContent = friend.nickname || "Friend";
+    row.querySelector("button").addEventListener("click", () => inviteFriend(friend.accountId));
+    roomFriendList.appendChild(row);
+  });
+}
+
+async function addFriend(targetUserId) {
+  try {
+    const data = await api("/api/friends/add", { ...authBody(), targetUserId });
+    state.profile = data.account || state.profile;
+    state.room = data.room;
+    renderRoom(data.room);
+    showToast("Friend added", "You can invite them directly from rooms now.", "system");
+  } catch (error) {
+    appendSystem(error.message);
+  }
+}
+
+async function inviteFriend(targetAccountId) {
+  try {
+    const data = await api("/api/friends/invite", { ...authBody(), targetAccountId });
+    state.room = data.room;
+    renderRoom(data.room);
+    showToast("Invite sent", "Your friend will see this room on their home screen.", "system");
+  } catch (error) {
+    appendSystem(error.message);
+  }
 }
 
 async function transferHost(targetUserId) {

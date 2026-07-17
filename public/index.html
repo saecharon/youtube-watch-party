@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>YouTube Watch Party</title>
-    <link rel="stylesheet" href="/styles.css?v=ludo-prod-1">
+    <link rel="stylesheet" href="/styles.css?v=privacy-rooms-1">
   </head>
   <body class="theme-party">
     <main class="app-shell">
@@ -57,6 +57,10 @@
             <label>
               Email address
               <input id="authEmailInput" type="email" maxlength="120" placeholder="you@college.edu" autocomplete="email" required>
+            </label>
+            <label class="check-row">
+              <input id="stayLoggedInInput" type="checkbox" checked>
+              <span>Stay logged in on this device</span>
             </label>
             <button type="submit" class="primary-button">Continue</button>
             <p id="emailError" class="error-text" role="alert"></p>
@@ -113,21 +117,39 @@
             <p>Bring your friends in, search music or movies, and keep the vibe synced.</p>
           </article>
 
-          <form id="joinForm" class="login-card home-card">
+          <section class="login-card home-card room-action-card">
             <div class="login-card-head">
               <span class="eyebrow">Room</span>
-              <h2>Create or join</h2>
+              <h2>Create room</h2>
+            </div>
+            <p class="muted-copy">Generates a private unique 6-digit room code.</p>
+            <button id="createRoomBtn" type="button" class="primary-button">Create Room</button>
+          </section>
+
+          <form id="joinForm" class="login-card home-card room-action-card">
+            <div class="login-card-head">
+              <span class="eyebrow">Join</span>
+              <h2>Join room</h2>
             </div>
             <label>
               Room code
-              <input id="roomInput" maxlength="32" placeholder="Leave empty to create new room">
+              <input id="roomInput" maxlength="32" inputmode="numeric" pattern="[0-9A-Za-z-]*" placeholder="Enter 6-digit code">
             </label>
             <input id="nameInput" class="hidden" aria-hidden="true">
             <input id="emailInput" class="hidden" aria-hidden="true">
             <input id="vibeInput" class="hidden" aria-hidden="true">
-            <button type="submit" class="primary-button">Create / Join room</button>
+            <button type="submit" class="secondary-button">Join Room</button>
             <p id="joinError" class="error-text" role="alert"></p>
           </form>
+
+          <section class="login-card home-card friends-card">
+            <div class="login-card-head">
+              <span class="eyebrow">Friends</span>
+              <h2>Direct invites</h2>
+            </div>
+            <div id="friendInviteList" class="friend-list empty-note">No friend invites yet.</div>
+            <div id="friendList" class="friend-list empty-note">Add friends from a room to invite them later.</div>
+          </section>
         </section>
       </section>
 
@@ -327,6 +349,7 @@
                 </div>
                 <span id="peopleCount">0/5</span>
               </div>
+              <div id="roomFriendList" class="room-friend-list empty-note">Add friends from this room, then invite them directly next time.</div>
               <div id="peopleList" class="people-list"></div>
             </div>
 
@@ -385,6 +408,6 @@
     </main>
 
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script src="/app.js?v=ludo-prod-1"></script>
+    <script src="/app.js?v=privacy-rooms-1"></script>
   </body>
 </html>

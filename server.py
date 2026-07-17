@@ -116,11 +116,15 @@ def ensure_account(email: str) -> dict:
             "email": email,
             "createdAt": now_ms(),
             "sessions": [],
+            "friends": [],
+            "roomInvites": [],
             "notificationPreferences": {"sounds": True, "browser": False},
             "soundPreferences": {"volume": 85},
         },
     )
     account.setdefault("sessions", [])
+    account.setdefault("friends", [])
+    account.setdefault("roomInvites", [])
     account.setdefault("rateLimits", {})
     account["lastSeen"] = now_ms()
     return account
@@ -137,9 +141,52 @@ def public_account(account: dict) -> dict:
         "status": account.get("status") or account.get("vibe") or "Ready",
         "profileComplete": bool(nickname),
         "lastSeenAt": account.get("lastSeen", 0),
+        "friends": public_friends(account),
+        "roomInvites": public_room_invites(account),
         "notificationPreferences": account.get("notificationPreferences", {"sounds": True, "browser": False}),
         "soundPreferences": account.get("soundPreferences", {"volume": 85}),
     }
+
+
+def public_friends(account: dict) -> list[dict]:
+    rows = []
+    for friend_id in account.get("friends", []):
+        friend = account_by_id(str(friend_id))
+        if not friend:
+            continue
+        rows.append(
+            {
+                "accountId": friend.get("id", ""),
+                "nickname": friend.get("nickname") or "Friend",
+                "avatar": friend.get("avatar", "🎧"),
+                "lastRoomId": friend.get("lastRoomId", ""),
+                "lastSeenAt": friend.get("lastSeen", 0),
+            }
+        )
+    return rows
+
+
+def public_room_invites(account: dict) -> list[dict]:
+    cutoff = now_ms() - 24 * 60 * 60 * 1000
+    invites = [invite for invite in account.get("roomInvites", []) if int(invite.get("at", 0)) >= cutoff]
+    account["roomInvites"] = invites[-20:]
+    return [
+        {
+            "id": invite.get("id", ""),
+            "roomId": invite.get("roomId", ""),
+            "fromName": invite.get("fromName", "Friend"),
+            "fromAvatar": invite.get("fromAvatar", "🎧"),
+            "at": invite.get("at", 0),
+        }
+        for invite in account["roomInvites"]
+    ]
+
+
+def account_by_id(account_id: str) -> dict | None:
+    for account in accounts.values():
+        if account.get("id") == account_id:
+            return account
+    return None
 
 
 def rate_limited(account: dict, bucket: str, limit: int, window_ms: int = RATE_WINDOW_MS) -> bool:
@@ -178,6 +225,10 @@ def account_by_session(session_token: str) -> dict | None:
 
 
 def new_room_id() -> str:
+    for _ in range(100):
+        candidate = f"{secrets.randbelow(900000) + 100000}"
+        if candidate not in rooms:
+            return candidate
     return secrets.token_urlsafe(5).replace("_", "-")
 
 
@@ -246,6 +297,7 @@ def active_users(room: dict) -> list[dict]:
     for user in room["users"].values():
         copy = {
             "id": user.get("id", ""),
+            "accountId": user.get("accountId", ""),
             "name": user.get("name", "Guest"),
             "avatar": user.get("avatar", "🎧"),
             "vibe": user.get("vibe", "Ready"),
@@ -807,11 +859,20 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
         if path == "/api/join":
             self.handle_join(data)
             return
+        if path == "/api/friends":
+            self.handle_friends(data)
+            return
 
         room_id, user_id = self.require_member(data)
         if not room_id:
             return
 
+        if path == "/api/friends/add":
+            self.handle_friend_add(room_id, user_id, data)
+            return
+        if path == "/api/friends/invite":
+            self.handle_friend_invite(room_id, user_id, data)
+            return
         if path == "/api/chat":
             self.handle_chat(room_id, user_id, data)
             return
@@ -978,6 +1039,7 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
     def handle_join(self, data: dict) -> None:
         auth_session = str(data.get("authSessionToken", ""))
         requested_room = str(data.get("roomId", "")).strip()
+        action = str(data.get("action", "join")).strip().lower()
         with lock:
             account = account_by_session(auth_session)
             if not account:
@@ -991,7 +1053,17 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
             avatar = account.get("avatar", "🎧")
             vibe = account.get("status") or "Ready"
             prune_rooms()
-            room_id, room = get_or_create_room(requested_room)
+            if action == "create":
+                room_id, room = get_or_create_room("")
+            else:
+                room_id = clean_room_id(requested_room)
+                if not room_id:
+                    self.json_response({"error": "Enter a room code or tap Create Room."}, HTTPStatus.BAD_REQUEST)
+                    return
+                room = rooms.get(room_id)
+                if not room:
+                    self.json_response({"error": "Room not found. Ask for the latest code or create a new room."}, HTTPStatus.NOT_FOUND)
+                    return
             if len(room["users"]) >= MAX_USERS:
                 self.json_response({"error": "This room already has 5 people."}, HTTPStatus.CONFLICT)
                 return
@@ -1011,13 +1083,83 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
                 "stats": {"chats": 0, "reactions": 0, "queueAdds": 0},
             }
             room["users"][user_id] = user
+            account["lastRoomId"] = room_id
             if not room.get("hostId"):
                 room["hostId"] = user_id
                 award_badges(user, "DJ")
             make_event(room, "system", {"message": f"{avatar} {name} joined the room."})
             make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
             snapshot = room_snapshot(room_id, room)
+            save_accounts()
         self.json_response({"user": user, "room": snapshot})
+
+    def handle_friends(self, data: dict) -> None:
+        token = str(data.get("sessionToken", ""))
+        with lock:
+            account = account_by_session(token)
+            if not account:
+                self.json_response({"error": "Session expired. Please log in again."}, HTTPStatus.UNAUTHORIZED)
+                return
+            save_accounts()
+            self.json_response({"account": public_account(account)})
+
+    def handle_friend_add(self, room_id: str, user_id: str, data: dict) -> None:
+        target_user_id = str(data.get("targetUserId", ""))
+        with lock:
+            room = rooms[room_id]
+            user = room["users"][user_id]
+            target_user = room["users"].get(target_user_id)
+            if not target_user:
+                self.json_response({"error": "That person is not in this room."}, HTTPStatus.NOT_FOUND)
+                return
+            if target_user_id == user_id:
+                self.json_response({"error": "You are already yourself, which is powerful enough."}, HTTPStatus.BAD_REQUEST)
+                return
+            account = account_by_id(str(user.get("accountId", "")))
+            target_account = account_by_id(str(target_user.get("accountId", "")))
+            if not account or not target_account:
+                self.json_response({"error": "Could not link these profiles right now."}, HTTPStatus.BAD_REQUEST)
+                return
+            account.setdefault("friends", [])
+            target_account.setdefault("friends", [])
+            if target_account["id"] not in account["friends"]:
+                account["friends"].append(target_account["id"])
+            if account["id"] not in target_account["friends"]:
+                target_account["friends"].append(account["id"])
+            save_accounts()
+            make_event(room, "system", {"message": f"{user['name']} and {target_user['name']} are friends now."})
+            make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+            snapshot = room_snapshot(room_id, room)
+        self.json_response({"ok": True, "room": snapshot, "account": public_account(account)})
+
+    def handle_friend_invite(self, room_id: str, user_id: str, data: dict) -> None:
+        target_account_id = str(data.get("targetAccountId", ""))
+        with lock:
+            room = rooms[room_id]
+            user = room["users"][user_id]
+            account = account_by_id(str(user.get("accountId", "")))
+            target_account = account_by_id(target_account_id)
+            if not account or not target_account:
+                self.json_response({"error": "Friend not found."}, HTTPStatus.NOT_FOUND)
+                return
+            if target_account_id not in account.get("friends", []):
+                self.json_response({"error": "Add this person as a friend before inviting directly."}, HTTPStatus.FORBIDDEN)
+                return
+            invite = {
+                "id": secrets.token_urlsafe(8),
+                "roomId": room_id,
+                "fromAccountId": account.get("id", ""),
+                "fromName": user.get("name", "Friend"),
+                "fromAvatar": user.get("avatar", "🎧"),
+                "at": now_ms(),
+            }
+            target_account.setdefault("roomInvites", []).append(invite)
+            target_account["roomInvites"] = target_account["roomInvites"][-20:]
+            save_accounts()
+            make_event(room, "system", {"message": f"{user['name']} invited a friend to room {room_id}."})
+            make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
+            snapshot = room_snapshot(room_id, room)
+        self.json_response({"ok": True, "room": snapshot})
 
     def handle_leave(self, data: dict) -> None:
         room_id = clean_room_id(str(data.get("roomId", "")))
