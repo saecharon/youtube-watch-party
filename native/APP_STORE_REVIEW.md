@@ -107,3 +107,9 @@ npm run native:open:android
 ```
 
 After Capacitor generates `ios/` and `android/`, apply the platform notes in this folder before uploading builds.
+
+The generated project in this repository already includes:
+
+- `ios/App/App/PrivacyInfo.xcprivacy` in the iOS app target.
+- Android backup disabled with `data_extraction_rules.xml`.
+- Only Android internet permission enabled by default.
