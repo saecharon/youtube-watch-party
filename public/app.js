@@ -40,6 +40,13 @@ const state = {
   installPrompt: null,
 };
 
+const API_ORIGIN = "https://youtube-watch-party-8com.onrender.com";
+const isNativeRuntime = () =>
+  location.protocol === "capacitor:" ||
+  location.protocol === "ionic:" ||
+  Boolean(window.Capacitor?.isNativePlatform?.());
+const apiUrl = (path) => (isNativeRuntime() && path.startsWith("/api/") ? `${API_ORIGIN}${path}` : path);
+
 const $ = (selector) => document.querySelector(selector);
 
 const joinView = $("#joinView");
@@ -817,7 +824,7 @@ function validateNicknameText(nickname) {
 
 async function loadAppConfig() {
   try {
-    const response = await fetch("/api/config");
+    const response = await fetch(apiUrl("/api/config"));
     const config = await response.json();
     state.config = config;
     document.title = config.appName || document.title;
@@ -908,7 +915,7 @@ function urlBase64ToUint8Array(base64String) {
 
 async function loadPublicRooms() {
   try {
-    const response = await fetch("/api/rooms");
+    const response = await fetch(apiUrl("/api/rooms"));
     const data = await response.json();
     publicRooms.innerHTML = "";
     if (!data.rooms.length) {
@@ -978,7 +985,7 @@ async function runMusicSearch(query) {
   searchResults.innerHTML = "";
   youtubeSearchLink.href = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
   try {
-    const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+    const response = await fetch(apiUrl(`/api/search?q=${encodeURIComponent(query)}`));
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Search failed");
     renderSearchResults(data.results || []);
@@ -1040,7 +1047,7 @@ async function pollEvents() {
       token: state.user.sessionToken || "",
       since: String(state.lastSeq),
     });
-    const response = await fetch(`/api/events?${query}`);
+    const response = await fetch(apiUrl(`/api/events?${query}`));
     if (!response.ok) throw new Error("Disconnected");
     const data = await response.json();
     if (state.wasDisconnected) {
@@ -2185,7 +2192,7 @@ function appendSystem(message) {
 }
 
 async function api(path, body) {
-  const response = await fetch(path, {
+  const response = await fetch(apiUrl(path), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -2196,7 +2203,7 @@ async function api(path, body) {
 }
 
 async function apiGet(path) {
-  const response = await fetch(path);
+  const response = await fetch(apiUrl(path));
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || "Something went wrong");
   return data;

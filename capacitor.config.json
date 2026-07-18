@@ -3,7 +3,6 @@
   "appName": "Watch Party Rooms",
   "webDir": "public",
   "server": {
-    "url": "https://youtube-watch-party-8com.onrender.com",
     "cleartext": false,
     "allowNavigation": [
       "youtube-watch-party-8com.onrender.com",
