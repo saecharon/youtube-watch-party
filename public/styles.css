@@ -152,6 +152,34 @@ textarea {
   display: none !important;
 }
 
+.native-boot {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-content: center;
+  gap: 10px;
+  background:
+    radial-gradient(circle at 50% 28%, rgba(255, 60, 172, 0.28), transparent 15rem),
+    linear-gradient(180deg, #090b12, #0d1020);
+  color: #f8fbff;
+  text-align: center;
+  font-weight: 900;
+}
+
+.native-boot strong {
+  font-size: 1.25rem;
+}
+
+.native-boot span {
+  color: #bfc7e8;
+  font-size: 0.9rem;
+}
+
+body.app-ready .native-boot {
+  display: none;
+}
+
 .login-view {
   min-height: calc(100vh - 64px);
   display: grid;

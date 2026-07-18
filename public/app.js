@@ -575,6 +575,7 @@ ludoResetBtn.addEventListener("click", async () => {
 });
 
 function showAuthStep(step) {
+  document.body.classList.add("app-ready");
   joinView.classList.remove("hidden");
   homeView.classList.add("hidden");
   partyView.classList.add("hidden");
@@ -586,6 +587,7 @@ function showAuthStep(step) {
 }
 
 function showHome() {
+  document.body.classList.add("app-ready");
   hydrateHomeProfile();
   joinView.classList.add("hidden");
   partyView.classList.add("hidden");
@@ -599,6 +601,7 @@ function showHome() {
 }
 
 function enterRoom(data) {
+  document.body.classList.add("app-ready");
   state.user = data.user;
   state.room = data.room;
   state.lastSeq = data.room.seq;
@@ -1205,7 +1208,8 @@ function renderRoom(room) {
   hostControls?.classList.toggle("hidden", !isHost);
   if (toggleRoomLockBtn) toggleRoomLockBtn.textContent = room.locked ? "Unlock room" : "Lock room";
   if (hostControlText) hostControlText.textContent = room.locked ? "Only current members can stay." : "New joins are allowed.";
-  document.body.className = `theme-${room.theme || "party"}`;
+  document.body.classList.remove("theme-late-night", "theme-study-lofi", "theme-party", "theme-movie", "theme-heartbreak", "theme-anime");
+  document.body.classList.add(`theme-${room.theme || "party"}`);
   renderThemes(room.theme);
   renderPeople(room);
   renderQueue(room);
