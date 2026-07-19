@@ -1187,6 +1187,11 @@ input:focus {
   height: 100%;
 }
 
+#player iframe {
+  display: block;
+  border: 0;
+}
+
 .player-overlay {
   position: absolute;
   inset: 0;

@@ -3,6 +3,7 @@ const state = {
   room: null,
   player: null,
   playerReady: false,
+  playerFallbackMode: false,
   playerInitStarted: false,
   playerLoadFallbackShown: false,
   lastSeq: 0,
@@ -360,14 +361,23 @@ document.querySelectorAll("[data-quick-search]").forEach((button) => {
 });
 
 playBtn.addEventListener("click", () => {
-  if (!state.playerReady) return;
+  if (!state.playerReady) {
+    if (state.room?.videoId) {
+      renderYouTubeIframeFallback(state.room.videoId, currentDesiredPosition(state.room), true);
+      sendControl("play", currentDesiredPosition(state.room));
+    }
+    return;
+  }
   applyDjConsole();
   state.player.playVideo?.();
   sendControl("play", state.player.getCurrentTime());
 });
 
 pauseBtn.addEventListener("click", () => {
-  if (!state.playerReady) return;
+  if (!state.playerReady) {
+    if (state.room?.videoId) sendControl("pause", currentDesiredPosition(state.room));
+    return;
+  }
   state.player.pauseVideo?.();
   sendControl("pause", state.player.getCurrentTime());
 });
@@ -952,6 +962,7 @@ function handlePlayerError(event) {
   const watchUrl = videoId ? `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}` : "https://www.youtube.com";
   const blocked = [100, 101, 150].includes(Number(event.data));
   const reason = blocked ? "This video owner does not allow embedded playback." : "YouTube could not play this video inside the app.";
+  if (videoId && !blocked) renderYouTubeIframeFallback(videoId, currentDesiredPosition(state.room || {}), false);
   statusText.innerHTML = `${reason} <a href="${watchUrl}" target="_blank" rel="noreferrer">Watch on YouTube</a>`;
   searchStatus.innerHTML = `${reason} Pick another search result, or <a href="${watchUrl}" target="_blank" rel="noreferrer">open it on YouTube</a>.`;
   playerOverlay.classList.add("ready");
@@ -962,9 +973,32 @@ function showPlayerLoadFallback() {
   state.playerLoadFallbackShown = true;
   const videoId = state.room?.videoId || "M7lc1UVf-VE";
   const watchUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
-  playerOverlay.innerHTML = `YouTube is slow on this device. <a href="${watchUrl}" target="_blank" rel="noreferrer">Open video</a>, then come back and tap Sync me.`;
-  playerOverlay.classList.remove("ready");
-  statusText.innerHTML = `Waiting for YouTube player. <a href="${watchUrl}" target="_blank" rel="noreferrer">Open current video</a>`;
+  renderYouTubeIframeFallback(videoId, currentDesiredPosition(state.room || {}), state.room?.status === "playing");
+  playerOverlay.classList.add("ready");
+  statusText.innerHTML = `Using mobile YouTube fallback. <a href="${watchUrl}" target="_blank" rel="noreferrer">Open in YouTube</a>`;
+}
+
+function renderYouTubeIframeFallback(videoId, start = 0, autoplay = false) {
+  if (!videoId) return;
+  state.playerFallbackMode = true;
+  const safeStart = Math.max(0, Math.floor(start || 0));
+  const params = new URLSearchParams({
+    rel: "0",
+    playsinline: "1",
+    start: String(safeStart),
+    autoplay: autoplay ? "1" : "0",
+  });
+  const frame = document.createElement("iframe");
+  frame.src = `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?${params}`;
+  frame.title = "YouTube player";
+  frame.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+  frame.allowFullscreen = true;
+  frame.referrerPolicy = "strict-origin-when-cross-origin";
+  const playerMount = document.getElementById("player");
+  if (!playerMount) return;
+  playerMount.innerHTML = "";
+  playerMount.appendChild(frame);
+  playerOverlay.classList.add("ready");
 }
 
 async function loadVideoForRoom(videoId, title = "YouTube video") {
@@ -1988,10 +2022,17 @@ function diceFace(value) {
 }
 
 function applySnapshot(room, options = false) {
-  if (!state.playerReady || !room.videoId) return;
+  if (!room.videoId) return;
   const force = typeof options === "boolean" ? options : Boolean(options?.force);
   const cueOnly = typeof options === "object" && Boolean(options?.cueOnly);
   const desired = currentDesiredPosition(room);
+  if (!state.playerReady) {
+    if (force || state.playerFallbackMode || state.playerLoadFallbackShown) {
+      renderYouTubeIframeFallback(room.videoId, desired, room.status === "playing");
+    }
+    renderStatus(room);
+    return;
+  }
   const currentVideo = state.player.getVideoData?.().video_id;
   const currentTime = state.player.getCurrentTime?.() || 0;
   const needsLoad = force || currentVideo !== room.videoId;
