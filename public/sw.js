@@ -1,9 +1,9 @@
-self.__WATCH_PARTY_CACHE = "watch-party-pwa-v11";
+self.__WATCH_PARTY_CACHE = "watch-party-pwa-v12";
 self.__WATCH_PARTY_ASSETS = [
   "/",
   "/index.html",
-  "/styles.css?v=youtube-fallback-1",
-  "/app.js?v=youtube-fallback-1",
+  "/styles.css?v=release-fix-1",
+  "/app.js?v=release-fix-1",
   "/manifest.webmanifest",
   "/icons/icon.svg",
   "/icons/icon-192.png",

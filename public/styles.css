@@ -4008,6 +4008,15 @@ body.app-native.view-room .side-panel {
   gap: 12px;
 }
 
+body.app-native.view-room .watch-layout {
+  display: block;
+}
+
+body.app-native.view-room .side-panel,
+body.app-native.view-room .main-stack {
+  display: contents;
+}
+
 body.app-native.view-room .player-panel,
 body.app-native.view-room .chat-card,
 body.app-native.view-room .games-panel,
@@ -4145,6 +4154,59 @@ body.app-native.view-room .games-panel {
   border-color: color-mix(in srgb, var(--accent-3) 30%, rgba(255, 255, 255, 0.1));
 }
 
+body.app-native.view-room[data-native-tab="watch"] .chat-card,
+body.app-native.view-room[data-native-tab="watch"] .games-panel,
+body.app-native.view-room[data-native-tab="watch"] .people-card,
+body.app-native.view-room[data-native-tab="chat"] .player-panel,
+body.app-native.view-room[data-native-tab="chat"] .search-panel,
+body.app-native.view-room[data-native-tab="chat"] .queue-panel,
+body.app-native.view-room[data-native-tab="chat"] .games-panel,
+body.app-native.view-room[data-native-tab="chat"] .people-card,
+body.app-native.view-room[data-native-tab="play"] .player-panel,
+body.app-native.view-room[data-native-tab="play"] .search-panel,
+body.app-native.view-room[data-native-tab="play"] .queue-panel,
+body.app-native.view-room[data-native-tab="play"] .chat-card,
+body.app-native.view-room[data-native-tab="play"] .people-card,
+body.app-native.view-room[data-native-tab="squad"] .player-panel,
+body.app-native.view-room[data-native-tab="squad"] .search-panel,
+body.app-native.view-room[data-native-tab="squad"] .queue-panel,
+body.app-native.view-room[data-native-tab="squad"] .chat-card,
+body.app-native.view-room[data-native-tab="squad"] .games-panel {
+  display: none;
+}
+
+body.app-native.view-room[data-native-tab="watch"] .player-panel,
+body.app-native.view-room[data-native-tab="watch"] .search-panel,
+body.app-native.view-room[data-native-tab="watch"] .queue-panel,
+body.app-native.view-room[data-native-tab="chat"] .chat-card,
+body.app-native.view-room[data-native-tab="play"] .games-panel,
+body.app-native.view-room[data-native-tab="squad"] .people-card {
+  display: grid;
+  margin-bottom: 12px;
+}
+
+body.app-native.view-room .game-action {
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+body.app-native.view-room .dice-chip {
+  min-width: 56px;
+  min-height: 56px;
+  cursor: pointer;
+  font-size: 1.65rem;
+}
+
+body.app-native.view-room #ludoResetBtn,
+body.app-native.view-room #snakesResetBtn {
+  min-height: 34px;
+  padding: 0 11px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  opacity: 0.84;
+}
+
 body.app-native.view-room .game-tabs button.selected {
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   box-shadow: 0 10px 26px color-mix(in srgb, var(--accent-2) 22%, transparent);
@@ -4174,8 +4236,10 @@ body.app-native.view-room .bottom-nav button {
 }
 
 body.app-native.view-room .bottom-nav button:focus-visible,
-body.app-native.view-room .bottom-nav button:active {
+body.app-native.view-room .bottom-nav button:active,
+body.app-native.view-room .bottom-nav button.active {
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 @media (max-width: 430px) {

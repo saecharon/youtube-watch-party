@@ -6,6 +6,7 @@ const state = {
   playerFallbackMode: false,
   playerInitStarted: false,
   playerLoadFallbackShown: false,
+  nativeRoomTab: "watch",
   lastSeq: 0,
   suppressPlayerEventsUntil: 0,
   pollTimer: null,
@@ -185,7 +186,6 @@ function initYouTubePlayer() {
   state.playerInitStarted = true;
   try {
     state.player = new YT.Player("player", {
-      videoId: "M7lc1UVf-VE",
       playerVars: { rel: 0, modestbranding: 1, playsinline: 1 },
       events: {
         onReady: () => {
@@ -437,6 +437,10 @@ toggleRoomLockBtn?.addEventListener("click", async () => {
 bottomNav?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-scroll-target]");
   if (!button) return;
+  if (document.body.classList.contains("app-native") && button.dataset.nativeTab) {
+    setNativeRoomTab(button.dataset.nativeTab);
+    return;
+  }
   document.querySelector(button.dataset.scrollTarget)?.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
@@ -556,6 +560,10 @@ snakesRollBtn.addEventListener("click", async () => {
   await rollRoomGame("snakes", snakesStatus);
 });
 
+snakesDice?.addEventListener("click", async () => {
+  if (!snakesRollBtn.disabled) await rollRoomGame("snakes", snakesStatus);
+});
+
 ludoRollBtn.addEventListener("click", async () => {
   if (state.ludo.pendingRoll?.playerId === state.user?.id) {
     ludoStatus.textContent = "Tap one of the glowing pawns on the board to move.";
@@ -564,6 +572,10 @@ ludoRollBtn.addEventListener("click", async () => {
     return;
   }
   await rollRoomGame("ludo", ludoStatus);
+});
+
+ludoDice?.addEventListener("click", async () => {
+  if (!ludoRollBtn.disabled) await rollRoomGame("ludo", ludoStatus);
 });
 
 ludoReadyBtn?.addEventListener("click", async () => {
@@ -622,6 +634,7 @@ function enterRoom(data) {
   bottomNav?.classList.remove("hidden");
   setAppView("room");
   arrangeNativeRoomLayout();
+  setNativeRoomTab("watch");
   renderRoom(data.room);
   renderInstallButtons();
   applySnapshot(data.room);
@@ -650,6 +663,15 @@ function arrangeNativeRoomLayout() {
   if (!chatCard || chatCard.parentElement === mainStack) return;
   mainStack.insertBefore(chatCard, playerPanel.nextElementSibling);
   chatCard.classList.add("native-room-chat");
+}
+
+function setNativeRoomTab(tab) {
+  state.nativeRoomTab = ["watch", "chat", "play", "squad"].includes(tab) ? tab : "watch";
+  document.body.dataset.nativeTab = state.nativeRoomTab;
+  bottomNav?.querySelectorAll("[data-native-tab]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.nativeTab === state.nativeRoomTab);
+  });
+  if (document.body.classList.contains("app-native")) window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 async function installApp() {
@@ -971,7 +993,13 @@ function handlePlayerError(event) {
 function showPlayerLoadFallback() {
   if (state.playerReady) return;
   state.playerLoadFallbackShown = true;
-  const videoId = state.room?.videoId || "M7lc1UVf-VE";
+  const videoId = state.room?.videoId || "";
+  if (!videoId) {
+    playerOverlay.classList.remove("ready");
+    playerOverlay.textContent = "Paste a YouTube link or search to load a video.";
+    statusText.textContent = "No video loaded";
+    return;
+  }
   const watchUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
   renderYouTubeIframeFallback(videoId, currentDesiredPosition(state.room || {}), state.room?.status === "playing");
   playerOverlay.classList.add("ready");
@@ -1117,24 +1145,24 @@ function handleEvent(event) {
     playNotice("chat");
   }
   if (event.type === "system") {
-    appendSystem(event.payload.message);
     showToast("Room update", event.payload.message, "system");
     notifyBrowser("Watch Party", event.payload.message);
     playNotice("join");
   }
-  if (event.type === "queue") appendSystem(event.payload.message);
-  if (event.type === "theme") appendSystem(`${event.payload.emoji} ${event.payload.by} switched to ${event.payload.name}.`);
-  if (event.type === "prompt") appendSystem(`Mini game: ${event.payload.text}`);
+  if (event.type === "queue") showToast("Queue", event.payload.message, "system");
+  if (event.type === "theme") showToast("Theme", `${event.payload.emoji} ${event.payload.by} switched to ${event.payload.name}.`, "system");
+  if (event.type === "prompt") showToast("Game", event.payload.text, "system");
   if (event.type === "reaction") {
     burstReaction(event.payload.emoji);
     playNotice("reaction");
   }
   if (event.type === "mix") {
     applyRoomMix(event.payload.mix);
-    if (event.payload.userId !== state.user.id) appendSystem(`${event.payload.name} tuned the DJ console.`);
+    if (event.payload.userId !== state.user.id) showToast("Sound", `${event.payload.name} changed bass/volume.`, "system");
   }
   if (event.type === "game") {
     if (event.payload.snapshot) applyGameSnapshot(event.payload.snapshot);
+    showToast("Game", event.payload.message || "Game updated.", "system");
     playGameNotice(event.payload.message || "");
     renderMiniGames();
   }
@@ -1150,7 +1178,7 @@ function handleEvent(event) {
     state.room.updatedAt = payload.updatedAt;
     applySnapshot(state.room);
     playNotice(payload.action === "load" ? "load" : "sync");
-    if (payload.userId !== state.user.id) appendSystem(`${payload.name} ${describeControl(payload.action)}.`);
+    if (payload.userId !== state.user.id) showToast("Playback", `${payload.name} ${describeControl(payload.action)}.`, "system");
   }
 }
 
@@ -1649,7 +1677,12 @@ function renderLudo() {
     ludoStartBtn.classList.toggle("hidden", !isHost && state.ludo.status !== "waiting");
   }
   const pendingForMe = pending?.playerId === state.user?.id;
-  ludoRollBtn.textContent = pendingForMe ? "Tap glowing pawn" : state.ludo.winner ? "Round finished" : "Roll dice";
+  if (state.ludo.status === "waiting") {
+    const allReady = players.length >= 1 && players.every((player) => state.ludo.ready?.[player.id]);
+    ludoRollBtn.textContent = !state.ludo.ready?.[state.user?.id] ? "Press Ready first" : isHost && allReady ? "Tap Start Ludo" : "Waiting for host";
+  } else {
+    ludoRollBtn.textContent = pendingForMe ? "Tap glowing pawn" : state.ludo.winner ? "Round finished" : isMyTurn ? "Your turn: Roll dice" : `${activePlayer.name}'s turn`;
+  }
   ludoRollBtn.disabled = !ludoPlayable || Boolean(state.ludo.winner) || (!isMyTurn && !pendingForMe) || (Boolean(pending) && !pendingForMe);
   ludoRollBtn.classList.toggle("hidden", ludoPlayable && !state.ludo.winner && !isMyTurn && !pendingForMe);
 
