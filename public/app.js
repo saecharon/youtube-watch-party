@@ -437,7 +437,7 @@ toggleRoomLockBtn?.addEventListener("click", async () => {
 bottomNav?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-scroll-target]");
   if (!button) return;
-  if (document.body.classList.contains("app-native") && button.dataset.nativeTab) {
+  if (isAppLikeRoomLayout() && button.dataset.nativeTab) {
     setNativeRoomTab(button.dataset.nativeTab);
     return;
   }
@@ -645,11 +645,18 @@ function enterRoom(data) {
 function setupAppShellMode() {
   const isNative = Boolean(window.Capacitor?.isNativePlatform?.() || window.Capacitor?.getPlatform?.() === "ios" || window.Capacitor?.getPlatform?.() === "android");
   const isStandalone = window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone;
-  document.body.classList.toggle("app-native", Boolean(isNative || isStandalone));
-  document.body.classList.toggle("app-browser", !isNative && !isStandalone);
+  const isMobileViewport = window.matchMedia?.("(max-width: 760px)")?.matches || window.innerWidth <= 760;
+  const appLike = Boolean(isNative || isStandalone || isMobileViewport);
+  document.body.classList.toggle("app-native", appLike);
+  document.body.classList.toggle("app-browser", !appLike);
   setAppView("login");
   arrangeNativeRoomLayout();
 }
+
+window.addEventListener("resize", () => {
+  setupAppShellMode();
+  if (state.room) setNativeRoomTab(state.nativeRoomTab);
+});
 
 function setAppView(view) {
   document.body.classList.toggle("view-login", view === "login");
@@ -671,7 +678,11 @@ function setNativeRoomTab(tab) {
   bottomNav?.querySelectorAll("[data-native-tab]").forEach((button) => {
     button.classList.toggle("active", button.dataset.nativeTab === state.nativeRoomTab);
   });
-  if (document.body.classList.contains("app-native")) window.scrollTo({ top: 0, behavior: "smooth" });
+  if (isAppLikeRoomLayout()) window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function isAppLikeRoomLayout() {
+  return document.body.classList.contains("app-native") || (window.matchMedia?.("(max-width: 760px)")?.matches ?? false);
 }
 
 async function installApp() {
