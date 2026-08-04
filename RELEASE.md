@@ -12,6 +12,14 @@ SUPPORT_EMAIL=your-support-email
 BUSINESS_NAME=your-business-name
 STRIPE_PAYMENT_LINK=your-stripe-payment-link
 YOUTUBE_API_KEY=your-youtube-data-api-key
+AUTH_SECRET=long-random-secret
+SMTP_HOST=smtp-provider-host
+SMTP_PORT=587
+SMTP_USERNAME=smtp-login
+SMTP_PASSWORD=smtp-password-or-app-password
+SMTP_FROM_EMAIL=no-reply@your-domain.com
+SMTP_FROM_NAME=Watch Party Rooms
+SMTP_SECURITY=starttls
 ```
 
 ## Launch Steps
@@ -20,9 +28,11 @@ YOUTUBE_API_KEY=your-youtube-data-api-key
 2. Add the environment variables above.
 3. Attach a custom domain and enable HTTPS.
 4. Open `/api/health` and confirm `ok` is `true`.
-5. Join one room from two devices, play a YouTube video, send chat, and roll both games.
-6. Confirm the Subscribe link appears when `STRIPE_PAYMENT_LINK` is set.
-7. Replace local JSON storage with Postgres/Redis before large public traffic.
+5. Open `/api/config` and confirm `emailOtpReady`, `officialYoutubeSearch`, and any required release flags are `true`.
+6. Request an OTP from a real email inbox and verify login.
+7. Join one room from two devices, play a YouTube video, send chat, and roll both games.
+8. Confirm the Subscribe link appears when `STRIPE_PAYMENT_LINK` is set.
+9. Replace local JSON storage with Postgres/Redis before large public traffic.
 
 ## Native App Build
 
@@ -39,7 +49,7 @@ Before store upload, complete `native/APP_STORE_REVIEW.md`, add real support/leg
 
 ## Current Production Foundation
 
-- Email-based room login.
+- Email OTP authentication with session-protected accounts.
 - Per-user session token required for chat, controls, reactions, games, themes, and polling.
 - Sanitized room snapshots so private session tokens are not exposed to other users.
 - Official YouTube Data API search is used when `YOUTUBE_API_KEY` is configured.

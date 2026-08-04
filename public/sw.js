@@ -1,9 +1,9 @@
-self.__WATCH_PARTY_CACHE = "watch-party-pwa-v13";
+self.__WATCH_PARTY_CACHE = "watch-party-pwa-v14";
 self.__WATCH_PARTY_ASSETS = [
   "/",
   "/index.html",
-  "/styles.css?v=mobile-room-1",
-  "/app.js?v=mobile-room-1",
+  "/styles.css?v=otp-release-1",
+  "/app.js?v=otp-release-1",
   "/manifest.webmanifest",
   "/icons/icon.svg",
   "/icons/icon-192.png",

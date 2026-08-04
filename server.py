@@ -8,10 +8,12 @@ import os
 import re
 import secrets
 import ssl
+import smtplib
 import threading
 import time
 import urllib.error
 import urllib.request
+from email.message import EmailMessage
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -35,6 +37,15 @@ YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY", "")
 AUTH_SECRET = os.environ.get("AUTH_SECRET", APP_NAME)
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
+SMTP_HOST = os.environ.get("SMTP_HOST", "")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587") or 587)
+SMTP_USERNAME = os.environ.get("SMTP_USERNAME", "")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+SMTP_FROM_EMAIL = os.environ.get("SMTP_FROM_EMAIL", SMTP_USERNAME or SUPPORT_EMAIL)
+SMTP_FROM_NAME = os.environ.get("SMTP_FROM_NAME", APP_NAME)
+SMTP_SECURITY = os.environ.get("SMTP_SECURITY", "starttls").lower()
+ALLOW_DEV_OTP = os.environ.get("ALLOW_DEV_OTP", "false").lower() == "true"
+ENABLE_PUBLIC_LOGIN = os.environ.get("ENABLE_PUBLIC_LOGIN", "false").lower() == "true"
 OTP_TTL_MS = 10 * 60 * 1000
 SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000
 RATE_WINDOW_MS = 60 * 1000
@@ -108,6 +119,59 @@ def nickname_error(nickname: str) -> str:
 
 def otp_digest(email: str, otp: str) -> str:
     return hashlib.sha256(f"{AUTH_SECRET}:{email}:{otp}".encode("utf-8")).hexdigest()
+
+
+def smtp_ready() -> bool:
+    return bool(SMTP_HOST and SMTP_FROM_EMAIL and (SMTP_PASSWORD or SMTP_SECURITY == "none"))
+
+
+def send_otp_email(email: str, otp: str) -> None:
+    if not smtp_ready():
+        if ALLOW_DEV_OTP:
+            print(f"[DEV OTP] {email}: {otp}")
+            return
+        raise RuntimeError("Email OTP is not configured. Add SMTP settings in Render.")
+
+    message = EmailMessage()
+    message["Subject"] = f"{APP_NAME} login code: {otp}"
+    message["From"] = f"{SMTP_FROM_NAME} <{SMTP_FROM_EMAIL}>"
+    message["To"] = email
+    message.set_content(
+        "\n".join(
+            [
+                f"Your {APP_NAME} login code is {otp}.",
+                "",
+                "This code expires in 10 minutes.",
+                "If you did not request this code, you can ignore this email.",
+            ]
+        )
+    )
+    message.add_alternative(
+        f"""
+        <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;color:#111827">
+          <h2 style="margin:0 0 12px">{APP_NAME} login code</h2>
+          <p style="font-size:16px">Use this six-digit code to continue:</p>
+          <div style="font-size:34px;font-weight:800;letter-spacing:8px;padding:18px 20px;border-radius:16px;background:#f3f4f6;text-align:center">{otp}</div>
+          <p style="color:#4b5563">This code expires in 10 minutes.</p>
+          <p style="color:#6b7280;font-size:13px">If you did not request this code, you can ignore this email.</p>
+        </div>
+        """,
+        subtype="html",
+    )
+
+    if SMTP_SECURITY == "ssl":
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=12) as smtp:
+            if SMTP_USERNAME:
+                smtp.login(SMTP_USERNAME, SMTP_PASSWORD)
+            smtp.send_message(message)
+        return
+
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=12) as smtp:
+        if SMTP_SECURITY != "none":
+            smtp.starttls(context=ssl.create_default_context())
+        if SMTP_USERNAME:
+            smtp.login(SMTP_USERNAME, SMTP_PASSWORD)
+        smtp.send_message(message)
 
 
 def ensure_account(email: str) -> dict:
@@ -810,6 +874,8 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
                     "storageProvider": "postgres-ready" if DATABASE_URL else "local-json",
                     "pushNotificationsReady": bool(VAPID_PUBLIC_KEY),
                     "vapidPublicKey": VAPID_PUBLIC_KEY,
+                    "emailOtpReady": smtp_ready(),
+                    "publicLoginEnabled": ENABLE_PUBLIC_LOGIN,
                 }
             )
             return
@@ -990,6 +1056,9 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
         return token
 
     def handle_public_login(self, data: dict) -> None:
+        if not ENABLE_PUBLIC_LOGIN:
+            self.json_response({"error": "Public test login is disabled. Use email OTP login."}, HTTPStatus.GONE)
+            return
         email = clean_email(str(data.get("email", "")))
         if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
             self.json_response({"error": "Enter a valid email address."}, HTTPStatus.BAD_REQUEST)
@@ -1018,8 +1087,16 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
             otp = f"{secrets.randbelow(1_000_000):06d}"
             account["pendingOtp"] = {"hash": otp_digest(email, otp), "expiresAt": now_ms() + OTP_TTL_MS, "attempts": 0}
             save_accounts()
-        # Local fallback only. Production must send this through Supabase/SMTP.
-        print(f"[DEV OTP] {email}: {otp}")
+        try:
+            send_otp_email(email, otp)
+        except Exception as exc:
+            with lock:
+                account = accounts.get(email)
+                if account:
+                    account.pop("pendingOtp", None)
+                    save_accounts()
+            self.json_response({"error": f"Could not send OTP email: {str(exc)[:180]}"}, HTTPStatus.SERVICE_UNAVAILABLE)
+            return
         self.json_response({"ok": True, "message": "OTP sent. Check your email for the six-digit code."})
 
     def handle_verify_otp(self, data: dict) -> None:

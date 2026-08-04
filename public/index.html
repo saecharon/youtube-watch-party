@@ -17,7 +17,7 @@
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
-    <link rel="stylesheet" href="/styles.css?v=mobile-room-1">
+    <link rel="stylesheet" href="/styles.css?v=otp-release-1">
   </head>
   <body class="theme-party">
     <div id="nativeBoot" class="native-boot">
@@ -58,9 +58,9 @@
         <section class="login-card auth-card">
           <div class="card-glow"></div>
           <div id="authWelcome" class="auth-step hidden">
-            <span class="eyebrow">Public test login</span>
+            <span class="eyebrow">Secure login</span>
             <h2>Continue to your rooms</h2>
-            <p class="muted-copy">Email login is open for testing. Enter your email, create your profile, and join a room instantly.</p>
+            <p class="muted-copy">Use email OTP to keep every account private and protected.</p>
             <button id="continueEmailBtn" type="button" class="primary-button">Continue with Email</button>
             <button id="loginEmailBtn" type="button" class="ghost-button">Login for existing users</button>
           </div>
@@ -70,7 +70,7 @@
               <span class="eyebrow">Private app login</span>
               <h2>Login with email</h2>
             </div>
-            <p class="muted-copy">Use your email to stay logged in on this device. Your email is not shown inside rooms.</p>
+            <p class="muted-copy">We will send a six-digit OTP. Your email is never shown inside rooms.</p>
             <label>
               Email address
               <input id="authEmailInput" type="email" maxlength="120" placeholder="you@college.edu" autocomplete="email" required>
@@ -79,8 +79,28 @@
               <input id="stayLoggedInInput" type="checkbox" checked>
               <span>Stay logged in on this device</span>
             </label>
-            <button type="submit" class="primary-button">Continue</button>
+            <button type="submit" class="primary-button">Send OTP</button>
             <p id="emailError" class="error-text" role="alert"></p>
+          </form>
+
+          <form id="otpForm" class="auth-step hidden">
+            <div class="login-card-head">
+              <span class="eyebrow">Email verification</span>
+              <h2>Enter OTP</h2>
+            </div>
+            <p id="otpHelpText" class="muted-copy">Enter the six-digit code sent to your email.</p>
+            <div class="otp-grid" aria-label="Six digit OTP">
+              <input class="otp-digit" inputmode="numeric" pattern="[0-9]*" maxlength="1" autocomplete="one-time-code" aria-label="OTP digit 1">
+              <input class="otp-digit" inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="OTP digit 2">
+              <input class="otp-digit" inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="OTP digit 3">
+              <input class="otp-digit" inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="OTP digit 4">
+              <input class="otp-digit" inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="OTP digit 5">
+              <input class="otp-digit" inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="OTP digit 6">
+            </div>
+            <button type="submit" class="primary-button">Verify and continue</button>
+            <button id="resendOtpBtn" type="button" class="ghost-button">Resend OTP</button>
+            <button id="changeEmailBtn" type="button" class="secondary-button">Change email</button>
+            <p id="otpError" class="error-text" role="alert"></p>
           </form>
 
           <form id="profileForm" class="auth-step hidden">
@@ -469,6 +489,6 @@
     </main>
 
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script src="/app.js?v=mobile-room-1"></script>
+    <script src="/app.js?v=otp-release-1"></script>
   </body>
 </html>

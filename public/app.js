@@ -32,6 +32,7 @@ const state = {
   mixSyncTimer: null,
   localMixUntil: 0,
   auth: null,
+  pendingAuthEmail: "",
   profile: null,
   nicknameTimer: null,
   nicknameAvailable: false,
@@ -63,6 +64,12 @@ const emailForm = $("#emailForm");
 const authEmailInput = $("#authEmailInput");
 const stayLoggedInInput = $("#stayLoggedInInput");
 const emailError = $("#emailError");
+const otpForm = $("#otpForm");
+const otpHelpText = $("#otpHelpText");
+const otpDigits = Array.from(document.querySelectorAll(".otp-digit"));
+const otpError = $("#otpError");
+const resendOtpBtn = $("#resendOtpBtn");
+const changeEmailBtn = $("#changeEmailBtn");
 const backToWelcomeBtn = $("#backToWelcomeBtn");
 const profileForm = $("#profileForm");
 const nicknameInput = $("#nicknameInput");
@@ -248,13 +255,63 @@ emailForm?.addEventListener("submit", async (event) => {
   emailError.textContent = "";
   const email = authEmailInput.value.trim();
   try {
-    const data = await api("/api/auth/public-login", { email });
-    setAuthSession(data.sessionToken, data.account, stayLoggedInInput?.checked !== false);
-    if (data.account.profileComplete) showHome();
-    else showAuthStep("profile");
+    await requestEmailOtp(email);
   } catch (error) {
     emailError.textContent = error.message;
   }
+});
+
+otpForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  otpError.textContent = "";
+  const otp = otpDigits.map((input) => input.value.trim()).join("");
+  if (!/^\d{6}$/.test(otp)) {
+    otpError.textContent = "Enter the six-digit OTP.";
+    return;
+  }
+  try {
+    const data = await api("/api/auth/verify-otp", { email: state.pendingAuthEmail, otp });
+    setAuthSession(data.sessionToken, data.account, stayLoggedInInput?.checked !== false);
+    clearOtpInputs();
+    if (data.account.profileComplete) showHome();
+    else showAuthStep("profile");
+  } catch (error) {
+    otpError.textContent = error.message;
+  }
+});
+
+resendOtpBtn?.addEventListener("click", async () => {
+  otpError.textContent = "";
+  try {
+    await requestEmailOtp(state.pendingAuthEmail || authEmailInput.value.trim(), true);
+  } catch (error) {
+    otpError.textContent = error.message;
+  }
+});
+
+changeEmailBtn?.addEventListener("click", () => {
+  clearOtpInputs();
+  showAuthStep("email");
+  authEmailInput.focus();
+});
+
+otpDigits.forEach((input, index) => {
+  input.addEventListener("input", () => {
+    input.value = input.value.replace(/\D/g, "").slice(0, 1);
+    if (input.value && otpDigits[index + 1]) otpDigits[index + 1].focus();
+  });
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Backspace" && !input.value && otpDigits[index - 1]) otpDigits[index - 1].focus();
+  });
+  input.addEventListener("paste", (event) => {
+    const digits = event.clipboardData?.getData("text")?.replace(/\D/g, "").slice(0, 6) || "";
+    if (digits.length < 2) return;
+    event.preventDefault();
+    digits.split("").forEach((digit, offset) => {
+      if (otpDigits[offset]) otpDigits[offset].value = digit;
+    });
+    otpDigits[Math.min(digits.length, 6) - 1]?.focus();
+  });
 });
 
 nicknameInput?.addEventListener("input", () => {
@@ -602,10 +659,29 @@ function showAuthStep(step) {
   homeView.classList.add("hidden");
   partyView.classList.add("hidden");
   setAppView("login");
-  [authWelcome, emailForm, profileForm].forEach((element) => element?.classList.add("hidden"));
+  [authWelcome, emailForm, otpForm, profileForm].forEach((element) => element?.classList.add("hidden"));
   if (step === "email") emailForm.classList.remove("hidden");
+  else if (step === "otp") otpForm.classList.remove("hidden");
   else if (step === "profile") profileForm.classList.remove("hidden");
   else emailForm.classList.remove("hidden");
+}
+
+async function requestEmailOtp(email, isResend = false) {
+  const cleanEmail = email.trim();
+  if (!cleanEmail) throw new Error("Enter your email address.");
+  const data = await api("/api/auth/request-otp", { email: cleanEmail });
+  state.pendingAuthEmail = cleanEmail;
+  if (otpHelpText) otpHelpText.textContent = `Enter the six-digit code sent to ${cleanEmail}.`;
+  clearOtpInputs();
+  showAuthStep("otp");
+  otpDigits[0]?.focus();
+  showToast(isResend ? "OTP resent" : "OTP sent", data.message || "Check your email for the six-digit code.", "system");
+}
+
+function clearOtpInputs() {
+  otpDigits.forEach((input) => {
+    input.value = "";
+  });
 }
 
 function showHome() {
@@ -880,6 +956,9 @@ async function loadAppConfig() {
     }
     if (config.officialYoutubeSearch) {
       searchStatus.textContent = "Official YouTube search is active. Search or tap a mood to play for everyone.";
+    }
+    if (emailError && config.emailOtpReady === false) {
+      emailError.textContent = "Email OTP needs SMTP settings on Render before public login can send codes.";
     }
     if (enableNotificationsBtn) enableNotificationsBtn.textContent = config.pushNotificationsReady ? "Notify me" : "Local alerts";
   } catch {
