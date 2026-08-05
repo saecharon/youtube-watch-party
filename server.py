@@ -44,6 +44,9 @@ SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
 SMTP_FROM_EMAIL = os.environ.get("SMTP_FROM_EMAIL", SMTP_USERNAME or SUPPORT_EMAIL)
 SMTP_FROM_NAME = os.environ.get("SMTP_FROM_NAME", APP_NAME)
 SMTP_SECURITY = os.environ.get("SMTP_SECURITY", "starttls").lower()
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", SMTP_FROM_EMAIL)
+EMAIL_PROVIDER = os.environ.get("EMAIL_PROVIDER", "resend" if RESEND_API_KEY else "smtp").lower()
 ALLOW_DEV_OTP = os.environ.get("ALLOW_DEV_OTP", "false").lower() == "true"
 ENABLE_PUBLIC_LOGIN = os.environ.get("ENABLE_PUBLIC_LOGIN", "false").lower() == "true"
 OTP_TTL_MS = 10 * 60 * 1000
@@ -125,12 +128,26 @@ def smtp_ready() -> bool:
     return bool(SMTP_HOST and SMTP_FROM_EMAIL and (SMTP_PASSWORD or SMTP_SECURITY == "none"))
 
 
+def resend_ready() -> bool:
+    return bool(RESEND_API_KEY and RESEND_FROM_EMAIL)
+
+
+def email_otp_ready() -> bool:
+    return resend_ready() or smtp_ready()
+
+
 def send_otp_email(email: str, otp: str) -> None:
+    if EMAIL_PROVIDER == "resend" and resend_ready():
+        send_resend_otp(email, otp)
+        return
     if not smtp_ready():
+        if resend_ready():
+            send_resend_otp(email, otp)
+            return
         if ALLOW_DEV_OTP:
             print(f"[DEV OTP] {email}: {otp}")
             return
-        raise RuntimeError("Email OTP is not configured. Add SMTP settings in Render.")
+        raise RuntimeError("Email OTP is not configured. Add Resend API or SMTP settings in Render.")
 
     message = EmailMessage()
     message["Subject"] = f"{APP_NAME} login code: {otp}"
@@ -172,6 +189,44 @@ def send_otp_email(email: str, otp: str) -> None:
         if SMTP_USERNAME:
             smtp.login(SMTP_USERNAME, SMTP_PASSWORD)
         smtp.send_message(message)
+
+
+def send_resend_otp(email: str, otp: str) -> None:
+    payload = {
+        "from": f"{SMTP_FROM_NAME} <{RESEND_FROM_EMAIL}>",
+        "to": [email],
+        "subject": f"{APP_NAME} login code: {otp}",
+        "text": "\n".join(
+            [
+                f"Your {APP_NAME} login code is {otp}.",
+                "",
+                "This code expires in 10 minutes.",
+                "If you did not request this code, you can ignore this email.",
+            ]
+        ),
+        "html": f"""
+        <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;color:#111827">
+          <h2 style="margin:0 0 12px">{APP_NAME} login code</h2>
+          <p style="font-size:16px">Use this six-digit code to continue:</p>
+          <div style="font-size:34px;font-weight:800;letter-spacing:8px;padding:18px 20px;border-radius:16px;background:#f3f4f6;text-align:center">{otp}</div>
+          <p style="color:#4b5563">This code expires in 10 minutes.</p>
+          <p style="color:#6b7280;font-size:13px">If you did not request this code, you can ignore this email.</p>
+        </div>
+        """,
+    }
+    request = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=12) as response:
+            if response.status >= 300:
+                raise RuntimeError(f"Resend returned HTTP {response.status}")
+    except urllib.error.HTTPError as exc:
+        details = exc.read().decode("utf-8", errors="replace")[:180]
+        raise RuntimeError(f"Resend email failed: {details}") from exc
 
 
 def ensure_account(email: str) -> dict:
@@ -874,7 +929,8 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
                     "storageProvider": "postgres-ready" if DATABASE_URL else "local-json",
                     "pushNotificationsReady": bool(VAPID_PUBLIC_KEY),
                     "vapidPublicKey": VAPID_PUBLIC_KEY,
-                    "emailOtpReady": smtp_ready(),
+                    "emailOtpReady": email_otp_ready(),
+                    "emailProvider": "resend" if resend_ready() else "smtp" if smtp_ready() else "none",
                     "publicLoginEnabled": ENABLE_PUBLIC_LOGIN,
                 }
             )

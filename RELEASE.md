@@ -13,6 +13,9 @@ BUSINESS_NAME=your-business-name
 STRIPE_PAYMENT_LINK=your-stripe-payment-link
 YOUTUBE_API_KEY=your-youtube-data-api-key
 AUTH_SECRET=long-random-secret
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=your-resend-api-key
+RESEND_FROM_EMAIL=onboarding@resend.dev-or-verified-domain-email
 SMTP_HOST=smtp-provider-host
 SMTP_PORT=587
 SMTP_USERNAME=smtp-login
@@ -21,6 +24,8 @@ SMTP_FROM_EMAIL=no-reply@your-domain.com
 SMTP_FROM_NAME=Watch Party Rooms
 SMTP_SECURITY=starttls
 ```
+
+For Render release, prefer `EMAIL_PROVIDER=resend` because SMTP ports can be blocked by cloud hosts. Gmail SMTP can remain configured as a fallback, but OTP delivery should use Resend over HTTPS.
 
 ## Launch Steps
 

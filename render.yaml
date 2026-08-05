@@ -35,3 +35,9 @@ services:
         value: Watch Party Rooms
       - key: SMTP_SECURITY
         value: starttls
+      - key: EMAIL_PROVIDER
+        value: resend
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        sync: false
