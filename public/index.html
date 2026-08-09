@@ -17,7 +17,7 @@
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
-    <link rel="stylesheet" href="/styles.css?v=zynlivo-simple-9">
+    <link rel="stylesheet" href="/styles.css?v=zynlivo-simple-10">
   </head>
   <body class="theme-party">
     <div id="nativeBoot" class="native-boot">
@@ -245,7 +245,7 @@
             <span class="eyebrow">Room</span>
             <strong class="status-pill room-status">Live room</strong>
             <h2 id="roomCode">-</h2>
-            <div id="roomMeta" class="room-meta">Party room</div>
+            <div id="roomMeta" class="room-meta">Room</div>
           </div>
           <div class="room-actions">
             <button id="copyLinkBtn" class="secondary-button">Copy link</button>
@@ -277,14 +277,7 @@
           <span id="hostControlText">Host controls active</span>
         </section>
 
-        <section class="theme-panel release-hidden">
-          <button data-theme="late-night">🌙 Late Night</button>
-          <button data-theme="study-lofi">📚 Study Lofi</button>
-          <button data-theme="party">🔥 Party</button>
-          <button data-theme="movie">🍿 Movie</button>
-          <button data-theme="heartbreak">💔 Heartbreak</button>
-          <button data-theme="anime">✨ Anime</button>
-        </section>
+        <section class="theme-panel release-hidden" aria-hidden="true"></section>
 
         <section class="watch-layout">
           <div class="main-stack">
@@ -358,20 +351,11 @@
                   <span class="eyebrow">Find Next</span>
                   <h3>YouTube search</h3>
                 </div>
-                <a id="youtubeSearchLink" href="https://www.youtube.com" target="_blank" rel="noreferrer">Open YouTube</a>
               </div>
               <form id="searchForm" class="search-form">
                 <input id="searchInput" placeholder="Search songs, trailers, podcasts..." aria-label="Search YouTube">
                 <button type="submit" class="secondary-button">Search</button>
               </form>
-              <div class="quick-music" aria-label="Quick music moods">
-                <button type="button" data-quick-search="lofi study music">📚 Study</button>
-                <button type="button" data-quick-search="party hits music">🔥 Party</button>
-                <button type="button" data-quick-search="hindi lofi songs">🎧 Hindi lofi</button>
-                <button type="button" data-quick-search="chill edm music">🌊 Chill EDM</button>
-                <button type="button" data-quick-search="anime opening songs">✨ Anime</button>
-                <button type="button" data-quick-search="love songs acoustic">💗 Love</button>
-              </div>
               <p id="searchStatus" class="search-status">Search YouTube, load one video, then press Play for everyone.</p>
               <div id="searchResults" class="search-results"></div>
             </section>
@@ -476,22 +460,12 @@
               </div>
               <div id="chatLog" class="chat-log" aria-live="polite"></div>
               <div class="moods hidden" aria-hidden="true"></div>
-              <div id="emojiPicker" class="emoji-picker" aria-label="Emoji picker">
-                <button type="button" data-emoji="😂">😂</button>
-                <button type="button" data-emoji="😍">😍</button>
-                <button type="button" data-emoji="🔥">🔥</button>
-                <button type="button" data-emoji="👏">👏</button>
-                <button type="button" data-emoji="😭">😭</button>
-                <button type="button" data-emoji="🎶">🎶</button>
-                <button type="button" data-emoji="🍿">🍿</button>
-                <button type="button" data-emoji="💯">💯</button>
-              </div>
+              <div id="emojiPicker" class="emoji-picker hidden" aria-hidden="true"></div>
               <form id="chatForm" class="chat-form">
-                <input id="chatInput" maxlength="400" placeholder="Type a message or add emoji..." aria-label="Chat message">
                 <input id="photoInput" class="hidden" type="file" accept="image/*" aria-label="Attach photo">
                 <button id="attachPhotoBtn" type="button" class="chat-tool-button" title="Attach photo" aria-label="Attach photo">＋</button>
-                <button id="micBtn" type="button" class="chat-tool-button" title="Speak message" aria-label="Speak message">🎙</button>
-                <button type="submit" class="primary-button">Send</button>
+                <input id="chatInput" maxlength="400" placeholder="Message..." aria-label="Chat message">
+                <button type="submit" class="send-icon-button" title="Send message" aria-label="Send message">➤</button>
               </form>
               <div id="attachmentPreview" class="attachment-preview hidden"></div>
             </div>
@@ -512,6 +486,6 @@
     </main>
 
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script src="/app.js?v=zynlivo-simple-9"></script>
+    <script src="/app.js?v=zynlivo-simple-10"></script>
   </body>
 </html>

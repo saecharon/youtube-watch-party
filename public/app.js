@@ -189,7 +189,7 @@ const playerPanel = $(".player-panel");
 const themeNames = {
   "late-night": "🌙 Late Night",
   "study-lofi": "📚 Study Lofi",
-  party: "🔥 Party",
+  party: "Room",
   movie: "🍿 Movie",
   heartbreak: "💔 Heartbreak",
   anime: "✨ Anime",
@@ -1256,7 +1256,8 @@ async function runMusicSearch(query) {
   if (!query) return;
   searchStatus.textContent = "Finding music...";
   searchResults.innerHTML = "";
-  youtubeSearchLink.href = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+  const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+  if (youtubeSearchLink) youtubeSearchLink.href = searchUrl;
   try {
     const response = await fetch(apiUrl(`/api/search?q=${encodeURIComponent(query)}`));
     const text = await response.text();
@@ -1270,7 +1271,7 @@ async function runMusicSearch(query) {
     renderSearchResults(data.results || []);
   } catch (error) {
     const message = error?.message || "Search could not load here";
-    searchStatus.innerHTML = `${message}. <a href="${youtubeSearchLink.href}" target="_blank" rel="noreferrer">Open YouTube results</a>.`;
+    searchStatus.textContent = `${message}. Try another search.`;
   }
 }
 
@@ -1473,7 +1474,7 @@ function renderRoom(room) {
   roomCode.textContent = room.roomId;
   peopleCount.textContent = `${room.users.length}/5`;
   const host = room.users.find((user) => user.id === room.hostId);
-  roomMeta.textContent = `${themeNames[room.theme] || "🔥 Party"} · Host: ${host?.name || "Open"}`;
+  roomMeta.textContent = `Host: ${host?.name || "Open"}`;
   if (sharePreviewTitle) sharePreviewTitle.textContent = `Room ${room.roomId}`;
   if (sharePreviewText) sharePreviewText.textContent = `${host?.name || "Host"} · ${room.users.length}/5 people · ${room.locked ? "Locked" : "Open"} private room`;
   if (claimHostBtn) {
