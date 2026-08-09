@@ -17,7 +17,7 @@
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
-    <link rel="stylesheet" href="/styles.css?v=zynlivo-simple-4">
+    <link rel="stylesheet" href="/styles.css?v=zynlivo-simple-5">
   </head>
   <body class="theme-party">
     <div id="nativeBoot" class="native-boot">
@@ -352,7 +352,7 @@
               </section>
             </section>
 
-            <section class="search-panel release-hidden">
+            <section class="search-panel">
               <div class="panel-heading">
                 <div>
                   <span class="eyebrow">Find Next</span>
@@ -372,7 +372,7 @@
                 <button type="button" data-quick-search="anime opening songs">✨ Anime</button>
                 <button type="button" data-quick-search="love songs acoustic">💗 Love</button>
               </div>
-              <p id="searchStatus" class="search-status">Search or tap a mood, then play music instantly for everyone.</p>
+              <p id="searchStatus" class="search-status">Search YouTube, load one video, then press Play for everyone.</p>
               <div id="searchResults" class="search-results"></div>
             </section>
 
@@ -387,18 +387,15 @@
               <div id="queueList" class="queue-list empty-note">Add songs from search to build the next queue.</div>
             </section>
 
-            <section class="prompt-card games-panel secondary-feature games-coming-soon">
+            <section class="prompt-card games-panel secondary-feature games-coming-soon release-hidden" aria-hidden="true">
               <div class="panel-heading">
                 <div>
-                  <span class="eyebrow">Coming soon</span>
-                  <h3>Games</h3>
+                  <span class="eyebrow"></span>
+                  <h3></h3>
                 </div>
               </div>
-              <p class="muted-copy">Ludo and Snake & Ladder are hidden for release testing. YouTube sync and chat are live now.</p>
-              <div class="coming-soon-list">
-                <span>Ludo</span>
-                <span>Snake & Ladder</span>
-              </div>
+              <p class="muted-copy"></p>
+              <div class="coming-soon-list"></div>
               <p id="promptText" class="hidden"></p>
               <div class="game-tabs hidden release-hidden" aria-label="Choose room game">
                 <button type="button" data-game-tab="ludo" class="selected">Ludo</button>
@@ -515,6 +512,6 @@
     </main>
 
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script src="/app.js?v=zynlivo-simple-4"></script>
+    <script src="/app.js?v=zynlivo-simple-5"></script>
   </body>
 </html>

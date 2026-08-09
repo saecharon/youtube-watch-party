@@ -1262,8 +1262,9 @@ async function runMusicSearch(query) {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Search failed");
     renderSearchResults(data.results || []);
-  } catch {
-    searchStatus.innerHTML = `Search could not load here. <a href="${youtubeSearchLink.href}" target="_blank" rel="noreferrer">Open YouTube results</a>.`;
+  } catch (error) {
+    const message = error?.message || "Search could not load here";
+    searchStatus.innerHTML = `${message}. <a href="${youtubeSearchLink.href}" target="_blank" rel="noreferrer">Open YouTube results</a>.`;
   }
 }
 
