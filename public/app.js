@@ -11,7 +11,7 @@ const state = {
   suppressPlayerEventsUntil: 0,
   pollTimer: null,
   wasDisconnected: false,
-  selectedAvatar: "🎧",
+  selectedAvatar: "male-1",
   lastTypingAt: 0,
   activeGame: "ludo",
   ludo: {
@@ -202,6 +202,27 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+const AVATAR_IDS = new Set(["male-1", "male-2", "male-3", "female-1", "female-2", "female-3"]);
+
+function avatarSrc(avatar) {
+  return AVATAR_IDS.has(avatar) ? `/avatars/${avatar}.svg` : "";
+}
+
+function renderAvatar(target, avatar = "male-1") {
+  if (!target) return;
+  const src = avatarSrc(avatar);
+  target.textContent = "";
+  if (!src) {
+    target.textContent = avatar || "";
+    return;
+  }
+  const img = document.createElement("img");
+  img.src = src;
+  img.alt = "";
+  img.loading = "lazy";
+  target.appendChild(img);
 }
 
 function initYouTubePlayer() {
@@ -905,7 +926,7 @@ function setAuthSession(sessionToken, account, persist = true) {
 
 function hydrateHomeProfile() {
   const profile = state.profile || {};
-  homeAvatar.textContent = profile.avatar || "🎧";
+  renderAvatar(homeAvatar, profile.avatar || "male-1");
   homeNickname.textContent = profile.nickname ? `@${profile.nickname}` : "@profile";
   const onlineFriends = (profile.friends || []).filter((friend) => friend.online).length;
   if (profileSummary) {
@@ -942,7 +963,8 @@ function renderHomeFriends() {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "friend-row";
-      button.innerHTML = `<span>${invite.fromAvatar || "🎧"}</span><strong></strong><small></small>`;
+      button.innerHTML = `<span></span><strong></strong><small></small>`;
+      renderAvatar(button.querySelector("span"), invite.fromAvatar || "male-1");
       button.querySelector("strong").textContent = `${invite.fromName || "Friend"} invited you`;
       button.querySelector("small").textContent = `Join room ${invite.roomId}`;
       button.addEventListener("click", () => {
@@ -963,7 +985,7 @@ function renderHomeFriends() {
         const row = document.createElement("div");
         row.className = "friend-row request-row";
         row.innerHTML = `<span></span><strong></strong><div class="request-actions"><button type="button" class="secondary-button accept-btn">Accept</button><button type="button" class="ghost-button reject-btn">Reject</button></div>`;
-        row.querySelector("span").textContent = request.fromAvatar || "🎧";
+        renderAvatar(row.querySelector("span"), request.fromAvatar || "male-1");
         row.querySelector("strong").textContent = `${request.fromName || "Someone"} wants to be friends`;
         row.querySelector(".accept-btn").addEventListener("click", () => respondFriendRequest(request.id, "accept"));
         row.querySelector(".reject-btn").addEventListener("click", () => respondFriendRequest(request.id, "reject"));
@@ -982,7 +1004,7 @@ function renderHomeFriends() {
     const row = document.createElement("div");
     row.className = "friend-row";
     row.innerHTML = `<span></span><strong></strong><small></small>`;
-    row.querySelector("span").textContent = friend.avatar || "🎧";
+    renderAvatar(row.querySelector("span"), friend.avatar || "male-1");
     row.querySelector("strong").textContent = friend.nickname || "Friend";
     row.querySelector("small").textContent = friend.online ? "Online now" : "Friend";
     friendList.appendChild(row);
@@ -1018,7 +1040,7 @@ function renderProfilePreview() {
   if (!profilePreviewAvatar) return;
   const nickname = nicknameInput?.value.trim() || "Your name";
   const status = "Ready";
-  profilePreviewAvatar.textContent = state.selectedAvatar || "🎧";
+  renderAvatar(profilePreviewAvatar, state.selectedAvatar || "male-1");
   profilePreviewNickname.textContent = nickname;
   profilePreviewName.textContent = "";
   profilePreviewStatus.textContent = status;
@@ -1355,7 +1377,7 @@ function handleEvent(event) {
   if (event.type === "chat") {
     appendChat(event.payload.name, event.payload.text, event.payload.avatar, event.payload.image);
     if (event.payload.name && event.payload.userId !== state.user?.id) {
-      showToast(`${event.payload.avatar || "💬"} ${event.payload.name}`, event.payload.text || "sent a photo", "chat");
+      showToast(event.payload.name, event.payload.text || "sent a photo", "chat");
       notifyBrowser(`${event.payload.name} in room ${state.room?.roomId || ""}`, event.payload.text || "sent a photo");
     }
     playNotice("chat");
@@ -1524,7 +1546,7 @@ function renderPeople(room) {
       <button type="button" class="host-transfer-btn hidden">Make host</button>
       <button type="button" class="remove-person-btn hidden">Remove</button>
     `;
-    person.querySelector(".person-avatar").textContent = user.avatar || "🎧";
+    renderAvatar(person.querySelector(".person-avatar"), user.avatar || "male-1");
     person.querySelector(".person-name").textContent = `${user.id === room.hostId ? "Host · " : ""}${label}`;
     person.querySelector(".person-vibe").textContent = `${user.online ? "online" : "away"} · ${user.vibe || "Ready"}`;
     const transferBtn = person.querySelector(".host-transfer-btn");
@@ -1560,7 +1582,7 @@ function renderRoomFriends() {
     const row = document.createElement("div");
     row.className = "room-friend-row";
     row.innerHTML = `<span></span><strong></strong><button type="button" class="secondary-button">Invite</button>`;
-    row.querySelector("span").textContent = friend.avatar || "🎧";
+    renderAvatar(row.querySelector("span"), friend.avatar || "male-1");
     row.querySelector("strong").textContent = friend.nickname || "Friend";
     row.querySelector("button").addEventListener("click", () => inviteFriend(friend.accountId));
     roomFriendList.appendChild(row);
@@ -1744,12 +1766,12 @@ function gamePlayers() {
     users = [state.user];
   }
   if (!users.length) {
-    users = [{ name: "Player 1", avatar: "🎧" }];
+    users = [{ name: "Player 1", avatar: "male-1" }];
   }
   return users.slice(0, 4).map((user, index) => ({
     id: user.id || "",
     name: user.name || `Player ${index + 1}`,
-    avatar: user.avatar || ["🎧", "🔥", "✨", "🍿"][index],
+    avatar: user.avatar || ["male-1", "male-2", "female-1", "female-2"][index],
     color: ["#16b75f", "#e7333f", "#1d8dff", "#ffc928"][index],
   }));
 }
@@ -1764,7 +1786,7 @@ function ludoPlayers() {
     return {
       id: user.id || id || "",
       name: user.name || `Player ${index + 1}`,
-      avatar: user.avatar || ["🎧", "🔥", "✨", "🍿"][index],
+      avatar: user.avatar || ["male-1", "male-2", "female-1", "female-2"][index],
       colorName,
       color: LUDO_COLOR_HEX[colorName] || "#e7333f",
     };
@@ -2080,7 +2102,7 @@ function renderSnakes() {
       return `
         <g class="svg-token snake-token ${active ? "active" : ""}" transform="translate(${x + offset}, ${y + offset})">
           <circle r="15" fill="${player.color}"></circle>
-          <text y="5">${escapeHtml(player.avatar)}</text>
+          <text y="5">${escapeHtml((player.avatar || "P").slice(0, 1).toUpperCase())}</text>
         </g>
       `;
     })
@@ -2449,11 +2471,11 @@ function toggleSpeechInput() {
   }
 }
 
-function appendChat(name, text, avatar = "🎧", image = null) {
+function appendChat(name, text, avatar = "male-1", image = null) {
   const item = document.createElement("div");
   item.className = "chat-message";
   item.innerHTML = `<span class="chat-avatar"></span><div><strong></strong><span class="chat-text"></span></div>`;
-  item.querySelector(".chat-avatar").textContent = avatar;
+  renderAvatar(item.querySelector(".chat-avatar"), avatar);
   item.querySelector("strong").textContent = name;
   item.querySelector(".chat-text").textContent = text;
   if (image?.data) {

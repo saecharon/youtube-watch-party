@@ -797,8 +797,9 @@ body.app-ready .native-boot {
   place-items: center;
   width: 34px;
   height: 34px;
-  border-radius: 10px;
+  border-radius: 999px;
   background: var(--cool-gradient);
+  overflow: hidden;
 }
 
 .friend-row strong,
@@ -1100,18 +1101,33 @@ input:focus {
 .emoji-picker button {
   display: grid;
   place-items: center;
-  min-width: 44px;
-  height: 44px;
-  border-radius: 8px;
+  min-width: 58px;
+  height: 58px;
+  padding: 3px;
+  border-radius: 18px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.07);
   color: var(--text);
   font-size: 1.15rem;
+  overflow: hidden;
+}
+
+.avatar-picker button img,
+.person-avatar img,
+.chat-avatar img,
+.friend-row > span img,
+.room-friend-row > span img,
+#homeAvatar img,
+#profilePreviewAvatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .avatar-picker button.selected {
-  border-color: rgba(255, 61, 110, 0.8);
-  background: rgba(255, 61, 110, 0.22);
+  border-color: rgba(34, 211, 238, 0.9);
+  background: rgba(34, 211, 238, 0.16);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
@@ -1792,10 +1808,11 @@ input:focus {
   place-items: center;
   width: 42px;
   height: 42px;
-  border-radius: 14px;
+  border-radius: 999px;
   background: var(--cool-gradient);
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06);
   font-size: 1.2rem;
+  overflow: hidden;
 }
 
 .person-name,

@@ -75,6 +75,7 @@ THEMES = {
 }
 
 DEFAULT_MIX = {"bass": 40, "volume": 85}
+AVATAR_IDS = {"male-1", "male-2", "male-3", "female-1", "female-2", "female-3"}
 
 PROMPTS = [
     "Rate this video out of 10.",
@@ -108,6 +109,11 @@ def clean_email(value: str) -> str:
 
 def clean_nickname(value: str) -> str:
     return re.sub(r"\s+", " ", value.strip())[:24]
+
+
+def clean_avatar(value: str) -> str:
+    avatar = str(value or "").strip()
+    return avatar if avatar in AVATAR_IDS else "male-1"
 
 
 def nickname_error(nickname: str) -> str:
@@ -268,7 +274,7 @@ def public_account(account: dict) -> dict:
         "email": account.get("email", ""),
         "nickname": nickname,
         "displayName": nickname,
-        "avatar": account.get("avatar", "🎧"),
+        "avatar": clean_avatar(account.get("avatar", "male-1")),
         "status": account.get("status") or account.get("vibe") or "Ready",
         "profileComplete": bool(nickname),
         "lastSeenAt": account.get("lastSeen", 0),
@@ -292,7 +298,7 @@ def public_friends(account: dict) -> list[dict]:
             {
                 "accountId": friend.get("id", ""),
                 "nickname": friend.get("nickname") or "Friend",
-                "avatar": friend.get("avatar", "🎧"),
+                "avatar": clean_avatar(friend.get("avatar", "male-1")),
                 "lastSeenAt": friend.get("lastSeen", 0),
                 "online": int(friend.get("lastSeen", 0) or 0) >= cutoff,
             }
@@ -309,7 +315,7 @@ def public_room_invites(account: dict) -> list[dict]:
             "id": invite.get("id", ""),
             "roomId": invite.get("roomId", ""),
             "fromName": invite.get("fromName", "Friend"),
-            "fromAvatar": invite.get("fromAvatar", "🎧"),
+            "fromAvatar": clean_avatar(invite.get("fromAvatar", "male-1")),
             "at": invite.get("at", 0),
         }
         for invite in account["roomInvites"]
@@ -327,7 +333,7 @@ def public_friend_requests(account: dict) -> list[dict]:
                 "id": request.get("id", ""),
                 "fromAccountId": request.get("fromAccountId", ""),
                 "fromName": request.get("fromName") or (from_account or {}).get("nickname") or "Someone",
-                "fromAvatar": request.get("fromAvatar") or (from_account or {}).get("avatar") or "🎧",
+                "fromAvatar": clean_avatar(request.get("fromAvatar") or (from_account or {}).get("avatar") or "male-1"),
                 "at": request.get("at", 0),
             }
         )
@@ -451,7 +457,7 @@ def active_users(room: dict) -> list[dict]:
             "id": user.get("id", ""),
             "accountId": user.get("accountId", ""),
             "name": user.get("name", "Guest"),
-            "avatar": user.get("avatar", "🎧"),
+            "avatar": clean_avatar(user.get("avatar", "male-1")),
             "vibe": user.get("vibe", "Ready"),
             "joinedAt": user.get("joinedAt", 0),
             "lastSeen": user.get("lastSeen", 0),
@@ -476,7 +482,7 @@ def queue_snapshot(room: dict) -> list[dict]:
 def room_game_players(room: dict) -> list[dict]:
     users = list(room["users"].values())[:4]
     if not users:
-        users = [{"id": "", "name": "Player 1", "avatar": "🎧"}]
+        users = [{"id": "", "name": "Player 1", "avatar": "male-1"}]
     return users
 
 
@@ -1200,7 +1206,7 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
         token = str(data.get("sessionToken", ""))
         nickname = clean_nickname(str(data.get("nickname", "")))
         display_name = str(data.get("displayName", "")).strip()[:32]
-        avatar = str(data.get("avatar", "🎧")).strip()[:8] or "🎧"
+        avatar = clean_avatar(data.get("avatar", "male-1"))
         status = str(data.get("status", "")).strip()[:60] or "Ready"
         error = nickname_error(nickname)
         if error:
@@ -1240,7 +1246,7 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
                 return
             name = account.get("nickname") or "Guest"
             email = account.get("email", "")
-            avatar = account.get("avatar", "🎧")
+            avatar = clean_avatar(account.get("avatar", "male-1"))
             vibe = account.get("status") or "Ready"
             prune_rooms()
             if action == "create":
@@ -1280,13 +1286,13 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
             if not room.get("hostId"):
                 room["hostId"] = user_id
                 award_badges(user, "DJ")
-            make_event(room, "system", {"message": f"{avatar} {name} joined the room."})
+            make_event(room, "system", {"message": f"{name} joined the room."})
             for other in room["users"].values():
                 if other.get("id") == user_id:
                     continue
                 other_account = account_by_id(str(other.get("accountId", "")))
                 if other_account and account["id"] in other_account.get("friends", []):
-                    make_event(room, "system", {"message": f"{avatar} Your friend {name} is online."})
+                    make_event(room, "system", {"message": f"Your friend {name} is online."})
                     break
             make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
             snapshot = room_snapshot(room_id, room)
@@ -1333,7 +1339,7 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
                         "id": secrets.token_urlsafe(8),
                         "fromAccountId": account["id"],
                         "fromName": user.get("name", "Friend"),
-                        "fromAvatar": user.get("avatar", "🎧"),
+                        "fromAvatar": clean_avatar(user.get("avatar", "male-1")),
                         "at": now_ms(),
                     }
                 )
@@ -1405,7 +1411,7 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
                 "roomId": room_id,
                 "fromAccountId": account.get("id", ""),
                 "fromName": user.get("name", "Friend"),
-                "fromAvatar": user.get("avatar", "🎧"),
+                "fromAvatar": clean_avatar(user.get("avatar", "male-1")),
                 "at": now_ms(),
             }
             target_account.setdefault("roomInvites", []).append(invite)
@@ -1432,7 +1438,7 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
                     room["hostId"] = next(iter(room["users"]), None)
                     if room["hostId"]:
                         award_badges(room["users"][room["hostId"]], "DJ")
-                make_event(room, "system", {"message": f"{user.get('avatar', '🎧')} {user['name']} left the room."})
+                make_event(room, "system", {"message": f"{user['name']} left the room."})
                 make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
                 room["lastSeen"] = now_ms()
         self.json_response({"ok": True})
@@ -1462,7 +1468,7 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
             if user["stats"]["chats"] >= 5:
                 award_badges(user, "Chat Star")
             room.get("typing", {}).pop(user_id, None)
-            make_event(room, "chat", {"userId": user_id, "name": user["name"], "avatar": user.get("avatar", "🎧"), "text": text, "image": image_payload})
+            make_event(room, "chat", {"userId": user_id, "name": user["name"], "avatar": clean_avatar(user.get("avatar", "male-1")), "text": text, "image": image_payload})
             make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
         self.json_response({"ok": True})
 
@@ -1617,7 +1623,7 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
             user["stats"]["reactions"] += 1
             if user["stats"]["reactions"] >= 5:
                 award_badges(user, "Top Reactor")
-            make_event(room, "reaction", {"emoji": emoji, "name": user["name"], "avatar": user.get("avatar", "🎧")})
+            make_event(room, "reaction", {"emoji": emoji, "name": user["name"], "avatar": clean_avatar(user.get("avatar", "male-1"))})
             make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
         self.json_response({"ok": True})
 
