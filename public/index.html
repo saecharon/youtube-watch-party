@@ -17,7 +17,7 @@
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
-    <link rel="stylesheet" href="/styles.css?v=zynlivo-simple-12">
+    <link rel="stylesheet" href="/styles.css?v=zynlivo-simple-13">
   </head>
   <body class="theme-party">
     <div id="nativeBoot" class="native-boot">
@@ -39,6 +39,23 @@
           </div>
           <h1>Zynlivo</h1>
           <p>Private YouTube rooms for friends. Watch together, stay synced, and chat without noise.</p>
+          <div class="brand-scene" aria-hidden="true">
+            <div class="scene-player">
+              <div class="scene-video">
+                <span class="scene-play">▶</span>
+                <span class="scene-live">LIVE</span>
+              </div>
+              <div class="scene-progress"><span></span></div>
+              <div class="scene-people">
+                <span><img src="/avatars/male-1.svg" alt=""></span>
+                <span><img src="/avatars/female-1.svg" alt=""></span>
+                <span><img src="/avatars/male-2.svg" alt=""></span>
+                <strong>3 watching</strong>
+              </div>
+            </div>
+            <div class="scene-chat scene-chat-one">Synced now</div>
+            <div class="scene-chat scene-chat-two">Send the next song</div>
+          </div>
         </div>
 
         <section class="login-card auth-card">
@@ -153,9 +170,20 @@
 
         <section class="home-grid">
           <article class="home-card welcome-banner">
-            <span class="eyebrow">Welcome back</span>
-            <h2>Create a private watch room.</h2>
-            <p>Share a code, load YouTube, and keep everyone on the same moment.</p>
+            <div>
+              <span class="eyebrow">Welcome back</span>
+              <h2>Create a private watch room.</h2>
+              <p>Share a code, load YouTube, and keep everyone on the same moment.</p>
+            </div>
+            <div class="welcome-visual" aria-hidden="true">
+              <div class="mini-screen"><span>▶</span></div>
+              <div class="mini-sync">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+              <p>3 friends synced</p>
+            </div>
           </article>
 
           <section class="login-card home-card room-action-card">
@@ -487,6 +515,6 @@
     </main>
 
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script src="/app.js?v=zynlivo-simple-12"></script>
+    <script src="/app.js?v=zynlivo-simple-13"></script>
   </body>
 </html>
