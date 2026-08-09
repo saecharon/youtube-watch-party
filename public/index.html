@@ -17,7 +17,7 @@
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
-    <link rel="stylesheet" href="/styles.css?v=zynlivo-simple-13">
+    <link rel="stylesheet" href="/styles.css?v=zynlivo-simple-17">
   </head>
   <body class="theme-party">
     <div id="nativeBoot" class="native-boot">
@@ -39,23 +39,9 @@
           </div>
           <h1>Zynlivo</h1>
           <p>Private YouTube rooms for friends. Watch together, stay synced, and chat without noise.</p>
-          <div class="brand-scene" aria-hidden="true">
-            <div class="scene-player">
-              <div class="scene-video">
-                <span class="scene-play">▶</span>
-                <span class="scene-live">LIVE</span>
-              </div>
-              <div class="scene-progress"><span></span></div>
-              <div class="scene-people">
-                <span><img src="/avatars/male-1.svg" alt=""></span>
-                <span><img src="/avatars/female-1.svg" alt=""></span>
-                <span><img src="/avatars/male-2.svg" alt=""></span>
-                <strong>3 watching</strong>
-              </div>
-            </div>
-            <div class="scene-chat scene-chat-one">Synced now</div>
-            <div class="scene-chat scene-chat-two">Send the next song</div>
-          </div>
+          <figure class="brand-scene" aria-hidden="true">
+            <img src="/graphics/zynlivo-hero.png" alt="">
+          </figure>
         </div>
 
         <section class="login-card auth-card">
@@ -172,8 +158,8 @@
           <article class="home-card welcome-banner">
             <div>
               <span class="eyebrow">Welcome back</span>
-              <h2>Create a private watch room.</h2>
-              <p>Share a code, load YouTube, and keep everyone on the same moment.</p>
+              <h2>Start room. Sync YouTube.</h2>
+              <p>Create a private room, control playback, and chat while everyone stays on the same moment.</p>
             </div>
             <div class="welcome-visual" aria-hidden="true">
               <div class="mini-screen"><span>▶</span></div>
@@ -182,89 +168,111 @@
                 <span></span>
                 <span></span>
               </div>
-              <p>3 friends synced</p>
+              <p>Live sync ready</p>
             </div>
           </article>
 
-          <section class="login-card home-card room-action-card">
-            <div class="login-card-head">
-              <span class="eyebrow">Room</span>
-              <h2>Create room</h2>
+          <details class="login-card home-card room-action-card dropdown-card">
+            <summary>
+              <span>
+                <span class="eyebrow">Room</span>
+                <strong>Create room</strong>
+              </span>
+            </summary>
+            <div class="dropdown-body">
+              <p class="muted-copy">Generates a private unique 6-digit room code.</p>
+              <button id="createRoomBtn" type="button" class="primary-button">Create Room</button>
             </div>
-            <p class="muted-copy">Generates a private unique 6-digit room code.</p>
-            <button id="createRoomBtn" type="button" class="primary-button">Create Room</button>
-          </section>
+          </details>
 
-          <form id="joinForm" class="login-card home-card room-action-card">
-            <div class="login-card-head">
-              <span class="eyebrow">Join</span>
-              <h2>Join room</h2>
-            </div>
-            <label>
-              Room code
-              <input id="roomInput" maxlength="32" inputmode="numeric" pattern="[0-9A-Za-z-]*" placeholder="Enter 6-digit code">
-            </label>
-            <input id="nameInput" class="hidden" aria-hidden="true">
-            <input id="emailInput" class="hidden" aria-hidden="true">
-            <input id="vibeInput" class="hidden" aria-hidden="true">
-            <button type="submit" class="secondary-button">Join Room</button>
-            <p id="joinError" class="error-text" role="alert"></p>
+          <form id="joinForm" class="login-card home-card room-action-card dropdown-card">
+            <details>
+              <summary>
+                <span>
+                  <span class="eyebrow">Join</span>
+                  <strong>Join room</strong>
+                </span>
+              </summary>
+              <div class="dropdown-body">
+                <label>
+                  Room code
+                  <input id="roomInput" maxlength="32" inputmode="numeric" pattern="[0-9A-Za-z-]*" placeholder="Enter 6-digit code">
+                </label>
+                <input id="nameInput" class="hidden" aria-hidden="true">
+                <input id="emailInput" class="hidden" aria-hidden="true">
+                <input id="vibeInput" class="hidden" aria-hidden="true">
+                <button type="submit" class="secondary-button">Join Room</button>
+                <p id="joinError" class="error-text" role="alert"></p>
+              </div>
+            </details>
           </form>
 
-          <section class="login-card home-card friends-card">
-            <div class="login-card-head">
-              <span class="eyebrow">Friends</span>
-              <h2>Friend options</h2>
+          <details class="login-card home-card friends-card dropdown-card">
+            <summary>
+              <span>
+                <span class="eyebrow">Friends</span>
+                <strong>Friend options</strong>
+              </span>
+            </summary>
+            <div class="dropdown-body">
+              <div class="profile-option-grid">
+                <button type="button" class="profile-option-button" data-profile-option="requests">
+                  <strong>Friend requests</strong>
+                  <span id="friendRequestCount">0 pending</span>
+                </button>
+                <button type="button" class="profile-option-button" data-profile-option="invites">
+                  <strong>Room invites</strong>
+                  <span id="friendInviteCount">0 invites</span>
+                </button>
+                <button type="button" class="profile-option-button" data-profile-option="friends">
+                  <strong>My friends</strong>
+                  <span id="friendCount">0 friends</span>
+                </button>
+              </div>
+              <p class="privacy-note">Friend online alerts and direct invites work only after both people accept friendship.</p>
+              <div id="friendInviteList" class="friend-list hidden"></div>
+              <div id="friendRequestList" class="friend-list hidden"></div>
+              <div id="friendList" class="friend-list hidden"></div>
             </div>
-            <div class="profile-option-grid">
-              <button type="button" class="profile-option-button" data-profile-option="requests">
-                <strong>Friend requests</strong>
-                <span id="friendRequestCount">0 pending</span>
-              </button>
-              <button type="button" class="profile-option-button" data-profile-option="invites">
-                <strong>Room invites</strong>
-                <span id="friendInviteCount">0 invites</span>
-              </button>
-              <button type="button" class="profile-option-button" data-profile-option="friends">
-                <strong>My friends</strong>
-                <span id="friendCount">0 friends</span>
-              </button>
-            </div>
-            <p class="privacy-note">Friend online alerts and direct invites work only after both people accept friendship.</p>
-            <div id="friendInviteList" class="friend-list hidden"></div>
-            <div id="friendRequestList" class="friend-list hidden"></div>
-            <div id="friendList" class="friend-list hidden"></div>
-          </section>
+          </details>
 
-          <section class="login-card home-card profile-card">
-            <div class="login-card-head">
-              <span class="eyebrow">Profile</span>
-              <h2>Privacy and account</h2>
+          <details class="login-card home-card profile-card dropdown-card">
+            <summary>
+              <span>
+                <span class="eyebrow">Profile</span>
+                <strong>Privacy and account</strong>
+              </span>
+            </summary>
+            <div class="dropdown-body">
+              <div id="profileSummary" class="profile-summary">Your email stays private. Only accepted friends can see online alerts and direct invites.</div>
+              <div class="profile-option-grid compact-options">
+                <button type="button" class="profile-option-button" id="profilePrivacyBtn">
+                  <strong>Privacy</strong>
+                  <span>Only friends see online alerts</span>
+                </button>
+                <button type="button" class="profile-option-button" id="profileNotificationsBtn">
+                  <strong>Notifications</strong>
+                  <span>Friend online, requests, invites</span>
+                </button>
+              </div>
+              <button id="logoutAllBtn" type="button" class="ghost-button">Logout this device</button>
             </div>
-            <div id="profileSummary" class="profile-summary">Your email stays private. Only accepted friends can see online alerts and direct invites.</div>
-            <div class="profile-option-grid compact-options">
-              <button type="button" class="profile-option-button" id="profilePrivacyBtn">
-                <strong>Privacy</strong>
-                <span>Only friends see online alerts</span>
-              </button>
-              <button type="button" class="profile-option-button" id="profileNotificationsBtn">
-                <strong>Notifications</strong>
-                <span>Friend online, requests, invites</span>
-              </button>
-            </div>
-            <button id="logoutAllBtn" type="button" class="ghost-button">Logout this device</button>
-          </section>
+          </details>
 
-          <section class="login-card home-card subscription-card">
-            <div class="login-card-head">
-              <span class="eyebrow">Plan</span>
-              <h2>Subscription ready</h2>
+          <details class="login-card home-card subscription-card dropdown-card">
+            <summary>
+              <span>
+                <span class="eyebrow">Plan</span>
+                <strong>Subscription ready</strong>
+              </span>
+            </summary>
+            <div class="dropdown-body">
+              <div class="plan-grid">
+                <div><strong>Free</strong><span>Private rooms, synced YouTube, live chat</span></div>
+                <div><strong>Premium</strong><span>5 seats, direct invites, priority rooms</span></div>
+              </div>
             </div>
-            <div class="plan-grid">
-              <div><strong>Free</strong><span>Private rooms, synced YouTube, live chat</span></div>
-              <div><strong>Premium</strong><span>5 seats, direct invites, priority rooms</span></div>
-            </div>
-          </section>
+          </details>
         </section>
       </section>
 
@@ -515,6 +523,6 @@
     </main>
 
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script src="/app.js?v=zynlivo-simple-13"></script>
+    <script src="/app.js?v=zynlivo-simple-17"></script>
   </body>
 </html>

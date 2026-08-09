@@ -1,13 +1,14 @@
-self.__WATCH_PARTY_CACHE = "zynlivo-pwa-v29";
+self.__WATCH_PARTY_CACHE = "zynlivo-pwa-v33";
 self.__WATCH_PARTY_ASSETS = [
   "/",
   "/index.html",
-  "/styles.css?v=zynlivo-simple-13",
-  "/app.js?v=zynlivo-simple-13",
+  "/styles.css?v=zynlivo-simple-17",
+  "/app.js?v=zynlivo-simple-17",
   "/manifest.webmanifest",
   "/icons/icon.svg",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
+  "/graphics/zynlivo-hero.png",
   "/avatars/male-1.svg",
   "/avatars/male-2.svg",
   "/avatars/male-3.svg",
