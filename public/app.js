@@ -1259,7 +1259,13 @@ async function runMusicSearch(query) {
   youtubeSearchLink.href = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
   try {
     const response = await fetch(apiUrl(`/api/search?q=${encodeURIComponent(query)}`));
-    const data = await response.json();
+    const text = await response.text();
+    let data = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      throw new Error("Search service is loading the old build");
+    }
     if (!response.ok) throw new Error(data.error || "Search failed");
     renderSearchResults(data.results || []);
   } catch (error) {

@@ -1,9 +1,9 @@
-self.__WATCH_PARTY_CACHE = "zynlivo-pwa-v20";
+self.__WATCH_PARTY_CACHE = "zynlivo-pwa-v22";
 self.__WATCH_PARTY_ASSETS = [
   "/",
   "/index.html",
-  "/styles.css?v=zynlivo-simple-5",
-  "/app.js?v=zynlivo-simple-5",
+  "/styles.css?v=zynlivo-simple-6",
+  "/app.js?v=zynlivo-simple-6",
   "/manifest.webmanifest",
   "/icons/icon.svg",
   "/icons/icon-192.png",
@@ -37,7 +37,7 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api/")) return;
 
-  if (request.mode === "navigate") {
+  if (request.mode === "navigate" || url.pathname === "/" || url.pathname === "/index.html") {
     event.respondWith(
       fetch(request)
         .then((response) => {
@@ -46,6 +46,21 @@ self.addEventListener("fetch", (event) => {
           return response;
         })
         .catch(() => caches.match("/") || caches.match("/index.html")),
+    );
+    return;
+  }
+
+  if (url.pathname.endsWith(".js") || url.pathname.endsWith(".css") || url.pathname === "/sw.js") {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(self.__WATCH_PARTY_CACHE).then((cache) => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request)),
     );
     return;
   }
