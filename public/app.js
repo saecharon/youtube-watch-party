@@ -1076,7 +1076,7 @@ async function loadAppConfig() {
       searchStatus.textContent = "Official YouTube search is active. Search or tap a mood to play for everyone.";
     }
     if (emailError && config.emailOtpReady === false) {
-      emailError.textContent = "Email OTP needs SMTP settings on Render before public login can send codes.";
+      emailError.textContent = "Local OTP is not configured yet. Add Resend/SMTP env vars, then restart the local server.";
     }
     if (enableNotificationsBtn) enableNotificationsBtn.textContent = config.pushNotificationsReady ? "Notify me" : "Local alerts";
   } catch {

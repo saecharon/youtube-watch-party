@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Zynlivo</title>
-    <meta name="description" content="Zynlivo creates private synced YouTube rooms with live chat, games, and friend invites.">
+    <meta name="description" content="Zynlivo creates private synced YouTube rooms with live chat and friend invites.">
     <meta name="theme-color" content="#061014">
     <meta name="color-scheme" content="dark">
     <meta name="mobile-web-app-capable" content="yes">
@@ -12,12 +12,12 @@
     <meta name="apple-mobile-web-app-title" content="Zynlivo">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta property="og:title" content="Join my Zynlivo room">
-    <meta property="og:description" content="Private synced YouTube room with live chat, games, and friend invites.">
+    <meta property="og:description" content="Private synced YouTube room with live chat and friend invites.">
     <meta property="og:type" content="website">
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
-    <link rel="stylesheet" href="/styles.css?v=zynlivo-simple-6">
+    <link rel="stylesheet" href="/styles.css?v=zynlivo-simple-7">
   </head>
   <body class="theme-party">
     <div id="nativeBoot" class="native-boot">
@@ -212,7 +212,7 @@
               <span class="eyebrow">Profile</span>
               <h2>Privacy and account</h2>
             </div>
-            <div id="profileSummary" class="profile-summary">Your email stays private. Watch history is private unless you become friends.</div>
+            <div id="profileSummary" class="profile-summary">Your email stays private. Only accepted friends can see online alerts and direct invites.</div>
             <div class="profile-option-grid compact-options">
               <button type="button" class="profile-option-button" id="profilePrivacyBtn">
                 <strong>Privacy</strong>
@@ -232,8 +232,8 @@
               <h2>Subscription ready</h2>
             </div>
             <div class="plan-grid">
-              <div><strong>Free</strong><span>2 friends, chat, watch party</span></div>
-              <div><strong>Premium</strong><span>5 seats, games, direct invites, history</span></div>
+              <div><strong>Free</strong><span>Private rooms, synced YouTube, live chat</span></div>
+              <div><strong>Premium</strong><span>5 seats, direct invites, priority rooms</span></div>
             </div>
           </section>
         </section>
@@ -456,14 +456,14 @@
               <div id="peopleList" class="people-list"></div>
             </div>
 
-            <div class="history-card hidden">
+            <div class="history-card hidden release-hidden" aria-hidden="true">
               <div class="panel-heading">
                 <div>
-                  <span class="eyebrow">Replay</span>
-                  <h3>Watch history</h3>
+                  <span class="eyebrow"></span>
+                  <h3></h3>
                 </div>
               </div>
-              <div id="historyList" class="history-list empty-note">Nothing watched yet.</div>
+              <div id="historyList" class="history-list empty-note"></div>
             </div>
 
             <div class="chat-card">
@@ -512,6 +512,6 @@
     </main>
 
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script src="/app.js?v=zynlivo-simple-6"></script>
+    <script src="/app.js?v=zynlivo-simple-7"></script>
   </body>
 </html>
