@@ -1,9 +1,9 @@
-self.__WATCH_PARTY_CACHE = "zynlivo-pwa-v23";
+self.__WATCH_PARTY_CACHE = "zynlivo-pwa-v25";
 self.__WATCH_PARTY_ASSETS = [
   "/",
   "/index.html",
-  "/styles.css?v=zynlivo-simple-7",
-  "/app.js?v=zynlivo-simple-7",
+  "/styles.css?v=zynlivo-simple-9",
+  "/app.js?v=zynlivo-simple-9",
   "/manifest.webmanifest",
   "/icons/icon.svg",
   "/icons/icon-192.png",

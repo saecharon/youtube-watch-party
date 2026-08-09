@@ -4690,3 +4690,307 @@ body.app-native.view-room .bottom-nav:not(.hidden) {
     grid-template-columns: 1fr;
   }
 }
+
+/* Local release redesign: cleaner dashboard rhythm inspired by Horse AI + accounts app */
+:root {
+  --bg: #05080f;
+  --panel: rgba(12, 18, 30, 0.88);
+  --panel-strong: rgba(15, 23, 42, 0.96);
+  --line: rgba(148, 163, 184, 0.18);
+  --accent: #22d3ee;
+  --accent-2: #f5c542;
+  --accent-3: #38bdf8;
+  --text: #f8fafc;
+  --muted: #94a3b8;
+  --shadow: 0 22px 70px rgba(0, 0, 0, 0.42);
+}
+
+html,
+body {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(34, 211, 238, 0.12), transparent 28rem),
+    radial-gradient(circle at 86% 12%, rgba(245, 197, 66, 0.09), transparent 22rem),
+    linear-gradient(145deg, #05080f 0%, #07111e 54%, #05080f 100%);
+  color: var(--text);
+}
+
+.hero-orbit,
+.brand-halo,
+.glass-disc,
+.card-glow,
+.reaction-layer,
+.reaction-dock,
+.float-reaction,
+.moods,
+.theme-panel,
+.launch-strip,
+.room-share-preview,
+.history-card,
+.games-panel,
+.queue-panel {
+  display: none !important;
+}
+
+.login-screen,
+.app-shell,
+.party-view,
+.home-view {
+  background: transparent;
+}
+
+.login-shell,
+.home-view,
+.party-view {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.login-copy {
+  min-height: auto;
+  padding: 8px 0;
+}
+
+.login-copy h1,
+.home-topbar h1,
+.topbar h1 {
+  color: var(--text);
+  background: none;
+  -webkit-background-clip: initial;
+  background-clip: initial;
+  text-shadow: none;
+  letter-spacing: 0;
+}
+
+.login-copy h1 {
+  max-width: none;
+  font-size: clamp(2.8rem, 8vw, 5.8rem);
+}
+
+.login-copy p,
+.muted-copy,
+.profile-summary,
+.privacy-note,
+.search-status,
+.status-text {
+  color: var(--muted);
+}
+
+.brand-row,
+.brand {
+  gap: 12px;
+}
+
+.brand-mark {
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(245, 197, 66, 0.28);
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f5c542, #38bdf8);
+  color: #07111e;
+  box-shadow: 0 14px 34px rgba(245, 197, 66, 0.16);
+}
+
+.login-card,
+.auth-card,
+.home-card,
+.player-panel,
+.search-panel,
+.people-card,
+.chat-card,
+.host-controls {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.025)),
+    var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.login-card,
+.auth-card {
+  padding: 22px;
+}
+
+.home-topbar,
+.topbar {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, rgba(2, 6, 23, 0.98), rgba(4, 15, 26, 0.94)),
+    radial-gradient(circle at 75% 100%, rgba(245, 197, 66, 0.14), transparent 24rem);
+  box-shadow: 0 18px 58px rgba(0, 0, 0, 0.36);
+}
+
+.eyebrow {
+  color: var(--accent-2);
+  letter-spacing: 0.08em;
+}
+
+.primary-button,
+.control-button {
+  border: 1px solid rgba(34, 211, 238, 0.36);
+  border-radius: 8px;
+  background: linear-gradient(135deg, #0891b2, #2563eb);
+  color: #ffffff;
+  box-shadow: 0 14px 34px rgba(34, 211, 238, 0.16);
+}
+
+.secondary-button,
+.ghost-button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #e2e8f0;
+  box-shadow: none;
+}
+
+.primary-button:hover,
+.secondary-button:hover,
+.ghost-button:hover,
+.control-button:hover {
+  transform: translateY(-1px);
+}
+
+input,
+textarea,
+select {
+  border-radius: 8px;
+  border-color: var(--line);
+  background: rgba(2, 6, 23, 0.72);
+  color: var(--text);
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+button:focus-visible {
+  outline: 3px solid rgba(34, 211, 238, 0.24);
+  outline-offset: 2px;
+}
+
+.home-grid {
+  gap: 14px;
+}
+
+.welcome-banner {
+  background:
+    linear-gradient(135deg, rgba(34, 211, 238, 0.14), rgba(245, 197, 66, 0.07)),
+    var(--panel-strong);
+}
+
+.plan-grid > div,
+.profile-option-button,
+.person-pill,
+.result-card,
+.chat-message,
+.system-message {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.68);
+  box-shadow: none;
+}
+
+.watch-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+  gap: 14px;
+}
+
+.main-stack,
+.side-panel {
+  gap: 14px;
+}
+
+.video-frame {
+  border-radius: 10px;
+  background: #020617;
+}
+
+.controls-row,
+.video-form,
+.search-form,
+.chat-form {
+  gap: 10px;
+}
+
+.quick-music button,
+.emoji-picker button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.72);
+  box-shadow: none;
+}
+
+.bottom-nav {
+  border-top: 1px solid var(--line);
+  background: rgba(2, 6, 23, 0.92);
+  backdrop-filter: blur(18px);
+}
+
+.bottom-nav button.active {
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.2), rgba(245, 197, 66, 0.14));
+  color: #fff;
+  box-shadow: none;
+}
+
+.release-hidden {
+  display: none !important;
+}
+
+@media (max-width: 760px) {
+  .login-shell,
+  .home-view,
+  .party-view {
+    padding: 12px;
+  }
+
+  .login-shell {
+    display: grid;
+    gap: 14px;
+  }
+
+  .home-topbar,
+  .topbar {
+    border-radius: 0 0 14px 14px;
+    margin: -12px -12px 12px;
+    padding: calc(12px + env(safe-area-inset-top)) 12px 12px;
+  }
+
+  .profile-chip {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .watch-layout {
+    display: block;
+  }
+
+  .player-panel,
+  .search-panel,
+  .people-card,
+  .chat-card {
+    margin-bottom: 12px;
+    border-radius: 12px;
+  }
+
+  .video-frame {
+    aspect-ratio: 16 / 9;
+    max-height: 30dvh;
+  }
+
+  .controls-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .controls-row .secondary-button,
+  .controls-row .status-text {
+    grid-column: 1 / -1;
+  }
+
+  .bottom-nav:not(.hidden) {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

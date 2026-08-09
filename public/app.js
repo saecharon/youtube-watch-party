@@ -2281,7 +2281,7 @@ function applySnapshot(room, options = false) {
     renderStatus(room);
     return;
   }
-  const currentVideo = state.player.getVideoData?.().video_id;
+  const currentVideo = state.player.getVideoData?.()?.video_id || "";
   const currentTime = state.player.getCurrentTime?.() || 0;
   const needsLoad = force || currentVideo !== room.videoId;
   const needsSeek = force || Math.abs(currentTime - desired) > 2.2;
