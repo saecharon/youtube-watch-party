@@ -1,7 +1,7 @@
 {
   "name": "Zynlivo",
   "short_name": "Zynlivo",
-  "description": "Private YouTube rooms with synced playback, clean live chat, games, and friend invites.",
+  "description": "Private YouTube rooms with synced playback, clean live chat, and friend invites.",
   "id": "/?source=pwa",
   "start_url": "/?source=pwa",
   "scope": "/",

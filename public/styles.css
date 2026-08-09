@@ -5086,3 +5086,175 @@ body.app-native .chat-form .primary-button,
 body.app-native.view-room .chat-form .primary-button {
   grid-column: auto;
 }
+
+/* Brand confidence pass */
+.native-boot {
+  gap: 10px;
+}
+
+.boot-logo {
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  box-shadow: 0 18px 50px rgba(34, 211, 238, 0.2);
+}
+
+.login-view {
+  min-height: 100dvh;
+  align-items: center;
+}
+
+.login-copy {
+  position: relative;
+  display: grid;
+  align-content: center;
+  gap: 18px;
+  min-height: 520px;
+  padding: 28px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 20% 12%, rgba(34, 211, 238, 0.18), transparent 20rem),
+    radial-gradient(circle at 80% 84%, rgba(245, 197, 66, 0.1), transparent 18rem),
+    linear-gradient(145deg, rgba(15, 23, 42, 0.72), rgba(2, 6, 23, 0.42));
+  overflow: hidden;
+}
+
+.login-copy::after {
+  content: "";
+  position: absolute;
+  left: 30px;
+  right: 30px;
+  bottom: 34px;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.85), rgba(245, 197, 66, 0.75), transparent);
+  box-shadow: 0 0 22px rgba(34, 211, 238, 0.32);
+}
+
+.brand-row {
+  position: relative;
+  z-index: 1;
+}
+
+.brand-mark {
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(34, 211, 238, 0.28);
+  background: #020617;
+}
+
+.brand-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.login-copy .brand-mark {
+  width: 76px;
+  height: 76px;
+  border-radius: 24px;
+  box-shadow: 0 22px 70px rgba(34, 211, 238, 0.18), 0 0 0 6px rgba(34, 211, 238, 0.055);
+}
+
+.login-copy .brand-row > span {
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: #e2faff;
+}
+
+.login-copy h1 {
+  position: relative;
+  z-index: 1;
+  max-width: 8ch;
+  font-size: clamp(3.4rem, 10vw, 7.4rem);
+  line-height: 0.92;
+  color: #f8fafc;
+}
+
+.login-copy p {
+  position: relative;
+  z-index: 1;
+  max-width: 32rem;
+  font-size: clamp(1rem, 1.6vw, 1.22rem);
+  line-height: 1.55;
+  color: #cbd5e1;
+}
+
+.auth-card {
+  border-color: rgba(34, 211, 238, 0.18);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.025)),
+    rgba(8, 13, 24, 0.94);
+}
+
+.login-card-head h2,
+.home-card h2,
+.panel-heading h3 {
+  letter-spacing: 0;
+}
+
+.home-topbar .brand-mark,
+.topbar .brand-mark {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+}
+
+.home-grid {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.welcome-banner {
+  grid-column: span 6;
+  min-height: 210px;
+  align-content: end;
+  border-color: rgba(245, 197, 66, 0.2);
+  background:
+    radial-gradient(circle at 20% 20%, rgba(245, 197, 66, 0.17), transparent 18rem),
+    radial-gradient(circle at 88% 70%, rgba(34, 211, 238, 0.14), transparent 20rem),
+    rgba(12, 18, 30, 0.9);
+}
+
+.room-action-card {
+  grid-column: span 3;
+}
+
+.friends-card,
+.profile-card {
+  grid-column: span 6;
+}
+
+.subscription-card {
+  grid-column: span 12;
+}
+
+.welcome-banner h2 {
+  max-width: 12ch;
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  line-height: 0.98;
+}
+
+@media (max-width: 900px) {
+  .login-copy {
+    min-height: auto;
+    border-radius: 14px;
+    padding: 22px;
+  }
+
+  .login-copy h1 {
+    font-size: clamp(3rem, 16vw, 5rem);
+  }
+
+  .home-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .welcome-banner,
+  .room-action-card,
+  .friends-card,
+  .profile-card,
+  .subscription-card {
+    grid-column: auto;
+  }
+}
