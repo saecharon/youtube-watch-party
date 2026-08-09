@@ -3,56 +3,41 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Watch Party Rooms</title>
-    <meta name="description" content="Create a private watch party room with synced YouTube playback, live chat, games, and friend invites.">
-    <meta name="theme-color" content="#090b12">
+    <title>Zynlivo</title>
+    <meta name="description" content="Zynlivo creates private synced YouTube rooms with live chat, games, and friend invites.">
+    <meta name="theme-color" content="#061014">
     <meta name="color-scheme" content="dark">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="Watch Party">
+    <meta name="apple-mobile-web-app-title" content="Zynlivo">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta property="og:title" content="Join my Watch Party Room">
-    <meta property="og:description" content="Private room, synced YouTube, live chat, and room games.">
+    <meta property="og:title" content="Join my Zynlivo room">
+    <meta property="og:description" content="Private synced YouTube room with live chat, games, and friend invites.">
     <meta property="og:type" content="website">
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
-    <link rel="stylesheet" href="/styles.css?v=otp-release-1">
+    <link rel="stylesheet" href="/styles.css?v=zynlivo-simple-4">
   </head>
   <body class="theme-party">
     <div id="nativeBoot" class="native-boot">
-      <strong>Watch Party Rooms</strong>
+      <strong>Zynlivo</strong>
       <span>Loading app...</span>
     </div>
     <main class="app-shell">
       <section id="joinView" class="login-view auth-view">
         <div class="login-copy">
-          <div class="hero-orbit" aria-hidden="true">
-            <span class="float-emoji emoji-one">🔥</span>
-            <span class="float-emoji emoji-two">😂</span>
-            <span class="float-emoji emoji-three">🎉</span>
-            <div class="mini-thumb thumb-one"></div>
-            <div class="mini-thumb thumb-two"></div>
-            <div class="glow-avatar avatar-one">🎧</div>
-            <div class="glow-avatar avatar-two">🍿</div>
+          <div class="hero-orbit clean-orbit" aria-hidden="true">
+            <div class="brand-halo"></div>
+            <div class="glass-disc disc-one"></div>
+            <div class="glass-disc disc-two"></div>
           </div>
           <div class="brand-row">
-            <div class="brand-mark">▶</div>
-            <span>Watch Party Rooms</span>
+            <div class="brand-mark" aria-hidden="true"><span>Z</span></div>
+            <span>Zynlivo</span>
           </div>
-          <h1>Watch. Chat. Play. Together.</h1>
-          <p>Create a room, invite your people, watch YouTube, chat live, and play games together.</p>
-          <div class="feature-strip">
-            <span>Free to join</span>
-            <span>Works on mobile</span>
-            <span>Live emoji chat</span>
-            <span>Synced YouTube</span>
-          </div>
-          <p class="trust-line">Private rooms • Stay logged in on this device</p>
-          <div class="legal-row">
-            <a href="/privacy.html">Privacy Policy</a>
-            <a href="/terms.html">Terms and Conditions</a>
-          </div>
+          <h1>Zynlivo</h1>
+          <p>Login once, create a room, invite your people, watch YouTube together, and chat live.</p>
         </div>
 
         <section class="login-card auth-card">
@@ -61,26 +46,42 @@
             <span class="eyebrow">Secure login</span>
             <h2>Continue to your rooms</h2>
             <p class="muted-copy">Use email OTP to keep every account private and protected.</p>
-            <button id="continueEmailBtn" type="button" class="primary-button">Continue with Email</button>
-            <button id="loginEmailBtn" type="button" class="ghost-button">Login for existing users</button>
+            <button id="continueEmailBtn" type="button" class="primary-button">Continue</button>
+            <button id="loginEmailBtn" type="button" class="ghost-button">Login</button>
           </div>
 
           <form id="emailForm" class="auth-step">
             <div class="login-card-head">
               <span class="eyebrow">Private app login</span>
-              <h2>Login with email</h2>
+              <h2>Login</h2>
             </div>
-            <p class="muted-copy">We will send a six-digit OTP. Your email is never shown inside rooms.</p>
+            <div class="auth-choice" aria-label="Account action">
+              <button type="button" class="selected">Login</button>
+              <button type="button">Create account</button>
+            </div>
+            <p class="muted-copy">Enter your email and we will send a six-digit OTP. New users can create an account after verification.</p>
             <label>
               Email address
               <input id="authEmailInput" type="email" maxlength="120" placeholder="you@college.edu" autocomplete="email" required>
             </label>
+            <div id="createAccountFields" class="create-account-fields hidden">
+              <label>
+                Name
+                <input id="accountNameInput" maxlength="40" placeholder="Your name" autocomplete="name">
+              </label>
+              <label>
+                Date of birth
+                <input id="dobInput" type="date" autocomplete="bday">
+              </label>
+              <p id="ageGateText" class="field-status">You must be 18+ to create an account. Your date of birth is only used for age verification and is not shown in rooms.</p>
+            </div>
             <label class="check-row">
               <input id="stayLoggedInInput" type="checkbox" checked>
-              <span>Stay logged in on this device</span>
+              <span>Remember me</span>
             </label>
-            <button type="submit" class="primary-button">Send OTP</button>
+            <button type="submit" class="primary-button">Send login code</button>
             <p id="emailError" class="error-text" role="alert"></p>
+            <p class="copyright-line">© 2026 Zynlivo. All rights reserved.</p>
           </form>
 
           <form id="otpForm" class="auth-step hidden">
@@ -134,10 +135,10 @@
       <section id="homeView" class="home-view hidden">
         <header class="home-topbar">
           <div class="brand-row">
-            <div class="brand-mark">▶</div>
+            <div class="brand-mark" aria-hidden="true"><span>Z</span></div>
             <div>
               <span class="eyebrow">Home</span>
-              <h1>Watch Party Rooms</h1>
+              <h1>Zynlivo</h1>
             </div>
           </div>
           <div class="profile-chip">
@@ -152,7 +153,7 @@
         <section class="home-grid">
           <article class="home-card welcome-banner">
             <span class="eyebrow">Welcome back</span>
-            <h2>Start a watch room in seconds.</h2>
+            <h2>Start a Zynlivo room in seconds.</h2>
             <p>Bring your friends in, search music or movies, and keep the vibe synced.</p>
           </article>
 
@@ -184,11 +185,26 @@
           <section class="login-card home-card friends-card">
             <div class="login-card-head">
               <span class="eyebrow">Friends</span>
-              <h2>Direct invites</h2>
+              <h2>Friend options</h2>
             </div>
-            <div id="friendInviteList" class="friend-list empty-note">No friend invites yet.</div>
-            <div id="friendRequestList" class="friend-list empty-note">No friend requests.</div>
-            <div id="friendList" class="friend-list empty-note">Add friends from a room to invite them later.</div>
+            <div class="profile-option-grid">
+              <button type="button" class="profile-option-button" data-profile-option="requests">
+                <strong>Friend requests</strong>
+                <span id="friendRequestCount">0 pending</span>
+              </button>
+              <button type="button" class="profile-option-button" data-profile-option="invites">
+                <strong>Room invites</strong>
+                <span id="friendInviteCount">0 invites</span>
+              </button>
+              <button type="button" class="profile-option-button" data-profile-option="friends">
+                <strong>My friends</strong>
+                <span id="friendCount">0 friends</span>
+              </button>
+            </div>
+            <p class="privacy-note">Friend online alerts and direct invites work only after both people accept friendship.</p>
+            <div id="friendInviteList" class="friend-list hidden"></div>
+            <div id="friendRequestList" class="friend-list hidden"></div>
+            <div id="friendList" class="friend-list hidden"></div>
           </section>
 
           <section class="login-card home-card profile-card">
@@ -196,7 +212,17 @@
               <span class="eyebrow">Profile</span>
               <h2>Privacy and account</h2>
             </div>
-            <div id="profileSummary" class="profile-summary">Your email stays private. Only chat name and avatar show in rooms.</div>
+            <div id="profileSummary" class="profile-summary">Your email stays private. Watch history is private unless you become friends.</div>
+            <div class="profile-option-grid compact-options">
+              <button type="button" class="profile-option-button" id="profilePrivacyBtn">
+                <strong>Privacy</strong>
+                <span>Only friends see online alerts</span>
+              </button>
+              <button type="button" class="profile-option-button" id="profileNotificationsBtn">
+                <strong>Notifications</strong>
+                <span>Friend online, requests, invites</span>
+              </button>
+            </div>
             <button id="logoutAllBtn" type="button" class="ghost-button">Logout this device</button>
           </section>
 
@@ -228,16 +254,16 @@
           </div>
         </header>
 
-        <section class="launch-strip" aria-label="Room status">
+        <section class="launch-strip release-hidden" aria-label="Room status">
           <strong>Live watch room</strong>
           <span>5 seats max</span>
           <span>Synced YouTube playback</span>
-          <span>Live chat and reactions</span>
+          <span>Clean live chat</span>
           <button id="installRoomAppBtn" type="button" class="subscribe-link hidden">Install app</button>
           <a id="subscribeLink" class="subscribe-link hidden" href="#" target="_blank" rel="noreferrer">Subscribe</a>
         </section>
 
-        <section id="roomSharePreview" class="room-share-preview">
+        <section id="roomSharePreview" class="room-share-preview release-hidden">
           <div>
             <span class="eyebrow">Invite card</span>
             <strong id="sharePreviewTitle">Room ready</strong>
@@ -251,7 +277,7 @@
           <span id="hostControlText">Host controls active</span>
         </section>
 
-        <section class="theme-panel">
+        <section class="theme-panel release-hidden">
           <button data-theme="late-night">🌙 Late Night</button>
           <button data-theme="study-lofi">📚 Study Lofi</button>
           <button data-theme="party">🔥 Party</button>
@@ -326,7 +352,7 @@
               </section>
             </section>
 
-            <section class="search-panel">
+            <section class="search-panel release-hidden">
               <div class="panel-heading">
                 <div>
                   <span class="eyebrow">Find Next</span>
@@ -350,7 +376,7 @@
               <div id="searchResults" class="search-results"></div>
             </section>
 
-            <section class="queue-panel">
+            <section class="queue-panel release-hidden">
               <div class="panel-heading">
                 <div>
                   <span class="eyebrow">Up Next</span>
@@ -361,19 +387,24 @@
               <div id="queueList" class="queue-list empty-note">Add songs from search to build the next queue.</div>
             </section>
 
-            <section class="prompt-card games-panel secondary-feature">
+            <section class="prompt-card games-panel secondary-feature games-coming-soon">
               <div class="panel-heading">
                 <div>
-                  <span class="eyebrow">Room Games</span>
-                  <h3>Play with room members</h3>
+                  <span class="eyebrow">Coming soon</span>
+                  <h3>Games</h3>
                 </div>
               </div>
+              <p class="muted-copy">Ludo and Snake & Ladder are hidden for release testing. YouTube sync and chat are live now.</p>
+              <div class="coming-soon-list">
+                <span>Ludo</span>
+                <span>Snake & Ladder</span>
+              </div>
               <p id="promptText" class="hidden"></p>
-              <div class="game-tabs" aria-label="Choose room game">
+              <div class="game-tabs hidden release-hidden" aria-label="Choose room game">
                 <button type="button" data-game-tab="ludo" class="selected">Ludo</button>
                 <button type="button" data-game-tab="snakes">Snake & Ladder</button>
               </div>
-              <div id="ludoGame" class="mini-game">
+              <div id="ludoGame" class="mini-game hidden release-hidden">
                 <div class="game-head">
                   <strong>Ludo</strong>
                   <span id="ludoStatus">Roll a 6 to open a pawn.</span>
@@ -395,7 +426,7 @@
                 </div>
                 <div id="ludoTurnBadge" class="turn-badge">Waiting for turn</div>
               </div>
-              <div id="snakesGame" class="mini-game">
+              <div id="snakesGame" class="mini-game hidden release-hidden">
                 <div class="game-head">
                   <strong>Snake & Ladder</strong>
                   <span id="snakesStatus">Roll dice. Reach 100 to win.</span>
@@ -441,17 +472,13 @@
             <div class="chat-card">
               <div class="panel-heading">
                 <div>
-                  <span class="eyebrow">Mood</span>
+                  <span class="eyebrow">Chat</span>
                   <h3>Chat</h3>
                 </div>
                 <span id="typingText">Live</span>
               </div>
               <div id="chatLog" class="chat-log" aria-live="polite"></div>
-              <div class="moods" aria-label="Quick mood reactions">
-                <button data-mood="🔥 Loved that">🔥 Loved that</button>
-                <button data-mood="🔁 Replay this">🔁 Replay this</button>
-                <button data-mood="✨ So good">✨ So good</button>
-              </div>
+              <div class="moods hidden" aria-hidden="true"></div>
               <div id="emojiPicker" class="emoji-picker" aria-label="Emoji picker">
                 <button type="button" data-emoji="😂">😂</button>
                 <button type="button" data-emoji="😍">😍</button>
@@ -478,7 +505,6 @@
       <nav id="bottomNav" class="bottom-nav hidden" aria-label="App navigation">
         <button type="button" data-native-tab="watch" data-scroll-target=".player-panel">▶ Watch</button>
         <button type="button" data-native-tab="chat" data-scroll-target=".chat-card">💬 Chat</button>
-        <button type="button" data-native-tab="play" data-scroll-target=".games-panel">🎲 Play</button>
         <button type="button" data-native-tab="squad" data-scroll-target=".people-card">👥 Squad</button>
       </nav>
       <footer class="app-footer">
@@ -489,6 +515,6 @@
     </main>
 
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script src="/app.js?v=otp-release-1"></script>
+    <script src="/app.js?v=zynlivo-simple-4"></script>
   </body>
 </html>

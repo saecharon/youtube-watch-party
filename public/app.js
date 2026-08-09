@@ -32,7 +32,9 @@ const state = {
   mixSyncTimer: null,
   localMixUntil: 0,
   auth: null,
+  authMode: "login",
   pendingAuthEmail: "",
+  pendingAccountName: "",
   profile: null,
   nicknameTimer: null,
   nicknameAvailable: false,
@@ -61,7 +63,12 @@ const heroJoinBtn = $("#heroJoinBtn");
 const continueEmailBtn = $("#continueEmailBtn");
 const loginEmailBtn = $("#loginEmailBtn");
 const emailForm = $("#emailForm");
+const authChoiceButtons = Array.from(document.querySelectorAll(".auth-choice button"));
 const authEmailInput = $("#authEmailInput");
+const createAccountFields = $("#createAccountFields");
+const accountNameInput = $("#accountNameInput");
+const dobInput = $("#dobInput");
+const ageGateText = $("#ageGateText");
 const stayLoggedInInput = $("#stayLoggedInInput");
 const emailError = $("#emailError");
 const otpForm = $("#otpForm");
@@ -123,7 +130,12 @@ const roomFriendList = $("#roomFriendList");
 const friendList = $("#friendList");
 const friendInviteList = $("#friendInviteList");
 const friendRequestList = $("#friendRequestList");
+const friendCount = $("#friendCount");
+const friendInviteCount = $("#friendInviteCount");
+const friendRequestCount = $("#friendRequestCount");
 const profileSummary = $("#profileSummary");
+const profilePrivacyBtn = $("#profilePrivacyBtn");
+const profileNotificationsBtn = $("#profileNotificationsBtn");
 const queueList = $("#queueList");
 const playQueueBtn = $("#playQueueBtn");
 const promptText = $("#promptText");
@@ -157,6 +169,10 @@ const typingText = $("#typingText");
 const playerOverlay = $("#playerOverlay");
 const reactionLayer = $("#reactionLayer");
 const subscribeLink = $("#subscribeLink");
+
+const adultDate = new Date();
+adultDate.setFullYear(adultDate.getFullYear() - 18);
+if (dobInput) dobInput.max = adultDate.toISOString().slice(0, 10);
 const toastDock = $("#toastDock");
 const roomSharePreview = $("#roomSharePreview");
 const sharePreviewTitle = $("#sharePreviewTitle");
@@ -234,7 +250,7 @@ window.addEventListener("beforeinstallprompt", (event) => {
 
 window.addEventListener("appinstalled", () => {
   state.installPrompt = null;
-  showToast("App installed", "Watch Party is now on your home screen.", "system");
+  showToast("App installed", "Zynlivo is now on your home screen.", "system");
   renderInstallButtons();
 });
 
@@ -254,10 +270,32 @@ emailForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   emailError.textContent = "";
   const email = authEmailInput.value.trim();
+  if (state.authMode === "create") {
+    const name = accountNameInput?.value.trim() || "";
+    if (name.length < 2) {
+      emailError.textContent = "Enter your name to create an account.";
+      accountNameInput?.focus();
+      return;
+    }
+    const age = calculateAge(dobInput?.value || "");
+    if (age === null) {
+      emailError.textContent = "Enter your date of birth to confirm you are 18+.";
+      dobInput?.focus();
+      return;
+    }
+    if (age < 18) {
+      emailError.textContent = "You must be 18 or older to create an account.";
+      dobInput?.focus();
+      return;
+    }
+    state.pendingAccountName = name;
+  } else {
+    state.pendingAccountName = "";
+  }
   try {
     await requestEmailOtp(email);
   } catch (error) {
-    emailError.textContent = error.message;
+    emailError.textContent = friendlyAuthError(error.message);
   }
 });
 
@@ -273,10 +311,14 @@ otpForm?.addEventListener("submit", async (event) => {
     const data = await api("/api/auth/verify-otp", { email: state.pendingAuthEmail, otp });
     setAuthSession(data.sessionToken, data.account, stayLoggedInInput?.checked !== false);
     clearOtpInputs();
+    if (!data.account.profileComplete && state.pendingAccountName && nicknameInput) {
+      nicknameInput.value = state.pendingAccountName;
+      renderProfilePreview();
+    }
     if (data.account.profileComplete) showHome();
     else showAuthStep("profile");
   } catch (error) {
-    otpError.textContent = error.message;
+    otpError.textContent = friendlyAuthError(error.message);
   }
 });
 
@@ -285,7 +327,7 @@ resendOtpBtn?.addEventListener("click", async () => {
   try {
     await requestEmailOtp(state.pendingAuthEmail || authEmailInput.value.trim(), true);
   } catch (error) {
-    otpError.textContent = error.message;
+    otpError.textContent = friendlyAuthError(error.message);
   }
 });
 
@@ -472,7 +514,7 @@ copyLinkBtn.addEventListener("click", async () => {
 copyInviteBtn?.addEventListener("click", async () => {
   if (!state.room) return;
   const host = state.room.users.find((user) => user.id === state.room.hostId);
-  const text = `${host?.name || "A friend"} invited you to Watch Party room ${state.room.roomId}: ${location.origin}${location.pathname}?room=${encodeURIComponent(state.room.roomId)}`;
+  const text = `${host?.name || "A friend"} invited you to Zynlivo room ${state.room.roomId}: ${location.origin}${location.pathname}?room=${encodeURIComponent(state.room.roomId)}`;
   await navigator.clipboard.writeText(text);
   copyInviteBtn.textContent = "Invite copied";
   setTimeout(() => {
@@ -581,6 +623,40 @@ micBtn?.addEventListener("click", () => {
   toggleSpeechInput();
 });
 
+document.querySelectorAll("[data-profile-option]").forEach((button) => {
+  button.addEventListener("click", () => showFriendSection(button.dataset.profileOption));
+});
+
+profilePrivacyBtn?.addEventListener("click", () => {
+  showToast("Privacy", "Only accepted friends can see online alerts or direct invites. One-time watchers cannot see your history.", "system");
+});
+
+profileNotificationsBtn?.addEventListener("click", () => {
+  enableNotifications();
+});
+
+authChoiceButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    authChoiceButtons.forEach((choice) => choice.classList.toggle("selected", choice === button));
+    const isCreate = button.textContent.trim().toLowerCase().includes("create");
+    state.authMode = isCreate ? "create" : "login";
+    const heading = emailForm?.querySelector("h2");
+    const copy = emailForm?.querySelector(".muted-copy");
+    const submit = emailForm?.querySelector("button[type='submit']");
+    createAccountFields?.classList.toggle("hidden", !isCreate);
+    if (accountNameInput) accountNameInput.required = isCreate;
+    if (dobInput) dobInput.required = isCreate;
+    if (emailError) emailError.textContent = "";
+    if (heading) heading.textContent = isCreate ? "Create account" : "Login";
+    if (copy) {
+      copy.textContent = isCreate
+        ? "Add your details and verify your email with a secure OTP."
+        : "Enter your email and we will send a six-digit OTP.";
+    }
+    if (submit) submit.textContent = isCreate ? "Create account" : "Send login code";
+  });
+});
+
 document.querySelectorAll("[data-reaction]").forEach((button) => {
   button.addEventListener("click", async () => {
     burstReaction(button.dataset.reaction);
@@ -684,6 +760,22 @@ function clearOtpInputs() {
   });
 }
 
+function calculateAge(dateValue) {
+  if (!dateValue) return null;
+  const dob = new Date(`${dateValue}T00:00:00`);
+  if (Number.isNaN(dob.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const monthDiff = today.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) age -= 1;
+  return age;
+}
+
+function friendlyAuthError(message = "") {
+  if (/too many otp|too many/i.test(message)) return "Too many OTP requests. Please wait one minute, then try again.";
+  return message || "Something went wrong. Please try again.";
+}
+
 function showHome() {
   document.body.classList.add("app-ready");
   hydrateHomeProfile();
@@ -725,7 +817,7 @@ function setupAppShellMode() {
   const appLike = Boolean(isNative || isStandalone || isMobileViewport);
   document.body.classList.toggle("app-native", appLike);
   document.body.classList.toggle("app-browser", !appLike);
-  setAppView("login");
+  setAppView(currentAppView());
   arrangeNativeRoomLayout();
 }
 
@@ -738,6 +830,12 @@ function setAppView(view) {
   document.body.classList.toggle("view-login", view === "login");
   document.body.classList.toggle("view-home", view === "home");
   document.body.classList.toggle("view-room", view === "room");
+}
+
+function currentAppView() {
+  if (partyView && !partyView.classList.contains("hidden")) return "room";
+  if (homeView && !homeView.classList.contains("hidden")) return "home";
+  return "login";
 }
 
 function arrangeNativeRoomLayout() {
@@ -776,7 +874,7 @@ async function installApp() {
   }
   const isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
   showToast(
-    "Install Watch Party",
+    "Install Zynlivo",
     isiOS ? "Tap Share, then Add to Home Screen." : "Use your browser menu and tap Install app.",
     "system",
   );
@@ -809,7 +907,10 @@ function hydrateHomeProfile() {
   const profile = state.profile || {};
   homeAvatar.textContent = profile.avatar || "🎧";
   homeNickname.textContent = profile.nickname ? `@${profile.nickname}` : "@profile";
-  if (profileSummary) profileSummary.textContent = `${profile.nickname || "Your profile"} · ${profile.plan || "free"} plan · email stays private`;
+  const onlineFriends = (profile.friends || []).filter((friend) => friend.online).length;
+  if (profileSummary) {
+    profileSummary.textContent = `${profile.nickname || "Your profile"} · friends only online alerts · ${onlineFriends} friend${onlineFriends === 1 ? "" : "s"} online`;
+  }
   if (nameInput) nameInput.value = profile.displayName || profile.nickname || "";
   if (emailInput) emailInput.value = profile.email || "";
   if (vibeInput) vibeInput.value = "Ready";
@@ -826,9 +927,14 @@ function renderHomeFriends() {
   if (!friendList || !friendInviteList) return;
   const profile = state.profile || {};
   const invites = profile.roomInvites || [];
+  const requests = profile.friendRequests || [];
+  const friends = profile.friends || [];
+  if (friendInviteCount) friendInviteCount.textContent = `${invites.length} invite${invites.length === 1 ? "" : "s"}`;
+  if (friendRequestCount) friendRequestCount.textContent = `${requests.length} pending`;
+  if (friendCount) friendCount.textContent = `${friends.length} friend${friends.length === 1 ? "" : "s"}`;
   friendInviteList.innerHTML = "";
   if (!invites.length) {
-    friendInviteList.textContent = "No friend invites yet.";
+    friendInviteList.innerHTML = `<div class="privacy-note">No room invites right now.</div>`;
     friendInviteList.classList.add("empty-note");
   } else {
     friendInviteList.classList.remove("empty-note");
@@ -846,11 +952,10 @@ function renderHomeFriends() {
       friendInviteList.appendChild(button);
     });
   }
-  const requests = profile.friendRequests || [];
   if (friendRequestList) {
     friendRequestList.innerHTML = "";
     if (!requests.length) {
-      friendRequestList.textContent = "No friend requests.";
+      friendRequestList.innerHTML = `<div class="privacy-note">No friend requests right now.</div>`;
       friendRequestList.classList.add("empty-note");
     } else {
       friendRequestList.classList.remove("empty-note");
@@ -866,10 +971,9 @@ function renderHomeFriends() {
       });
     }
   }
-  const friends = profile.friends || [];
   friendList.innerHTML = "";
   if (!friends.length) {
-    friendList.textContent = "Add friends from a room to invite them later.";
+    friendList.innerHTML = `<div class="privacy-note">Add friends from inside a room. Only accepted friends can see online alerts.</div>`;
     friendList.classList.add("empty-note");
     return;
   }
@@ -880,8 +984,22 @@ function renderHomeFriends() {
     row.innerHTML = `<span></span><strong></strong><small></small>`;
     row.querySelector("span").textContent = friend.avatar || "🎧";
     row.querySelector("strong").textContent = friend.nickname || "Friend";
-    row.querySelector("small").textContent = friend.lastRoomId ? `Last room ${friend.lastRoomId}` : "Ready for invites";
+    row.querySelector("small").textContent = friend.online ? "Online now" : "Friend";
     friendList.appendChild(row);
+  });
+}
+
+function showFriendSection(section) {
+  const map = {
+    invites: friendInviteList,
+    requests: friendRequestList,
+    friends: friendList,
+  };
+  Object.entries(map).forEach(([key, element]) => {
+    element?.classList.toggle("hidden", key !== section);
+  });
+  document.querySelectorAll("[data-profile-option]").forEach((button) => {
+    button.classList.toggle("selected", button.dataset.profileOption === section);
   });
 }
 
@@ -1016,7 +1134,7 @@ async function enableNotifications() {
       } else {
         subscription = { endpoint: `local:${location.origin}`, keys: {}, registeredAt: Date.now() };
       }
-      registration.showNotification?.("Watch Party notifications on", { body: "Chat, invites, and game turns can alert you.", tag: "watch-party-ready" });
+      registration.showNotification?.("Zynlivo notifications on", { body: "Chat, invites, and game turns can alert you.", tag: "watch-party-ready" });
     }
   } catch {
     // Browsers can block service workers in preview; normal in local testing.
@@ -1236,7 +1354,7 @@ function handleEvent(event) {
   }
   if (event.type === "system") {
     showToast("Room update", event.payload.message, "system");
-    notifyBrowser("Watch Party", event.payload.message);
+    notifyBrowser("Zynlivo", event.payload.message);
     playNotice("join");
   }
   if (event.type === "queue") showToast("Queue", event.payload.message, "system");
@@ -2245,12 +2363,7 @@ function clamp(value, min, max) {
 }
 
 function burstReaction(emoji) {
-  const item = document.createElement("span");
-  item.className = "float-reaction";
-  item.textContent = emoji;
-  item.style.left = `${16 + Math.random() * 68}%`;
-  reactionLayer.appendChild(item);
-  setTimeout(() => item.remove(), 1600);
+  showToast("Reaction", emoji, "reaction");
 }
 
 function fileToDataUrl(file) {

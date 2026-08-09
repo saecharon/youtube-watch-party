@@ -9,7 +9,7 @@ npm run native:open:ios
 Then apply these settings:
 
 1. Set bundle identifier to `com.watchparty.rooms`.
-2. Set display name to `Watch Party Rooms`.
+2. Set display name to `Zynlivo`.
 3. Set deployment target to the current App Store-supported iOS version you want to support.
 4. Confirm `ios/App/App/PrivacyInfo.xcprivacy` is present in the Xcode app target. It is already wired into this generated project.
 5. Use HTTPS only. Do not enable broad App Transport Security exceptions.

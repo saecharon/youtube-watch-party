@@ -10,7 +10,7 @@ services:
       - key: PORT
         value: 8080
       - key: APP_NAME
-        value: Watch Party Rooms
+        value: Zynlivo
       - key: SUPPORT_EMAIL
         sync: false
       - key: BUSINESS_NAME
@@ -32,7 +32,7 @@ services:
       - key: SMTP_FROM_EMAIL
         sync: false
       - key: SMTP_FROM_NAME
-        value: Watch Party Rooms
+        value: Zynlivo
       - key: SMTP_SECURITY
         value: starttls
       - key: EMAIL_PROVIDER

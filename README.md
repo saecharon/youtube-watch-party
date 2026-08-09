@@ -1,4 +1,4 @@
-# Watch Party Rooms
+# Zynlivo
 
 A watch-party app for up to 5 people per room. Everyone joins the same room, watches the same YouTube video, chats, reacts, searches music, and plays synced mini-games together.
 
@@ -43,7 +43,7 @@ docker run -p 8080:8080 youtube-watch-party
 
 ## iOS and Android
 
-The app includes Capacitor config for native iOS and Android wrappers using the safer public app name `Watch Party Rooms`.
+The app includes Capacitor config for native iOS and Android wrappers using the public app name `Zynlivo`.
 
 ```bash
 npm install
@@ -85,8 +85,8 @@ The blueprint uses Render's free plan for quick demos. See `EASY_WEBHOST.md` for
 - In-app YouTube search with one-click room loading
 - Instant music search with quick mood buttons
 - Shared play, pause, seek, and video changes
-- Floating reactions over the video
-- Live chat with emoji picker and simple mood reactions
+- Clean emoji chat without floating video clutter
+- Live chat with emoji picker
 - Typing presence, badges, mini-game prompts, synced Snake & Ladder, and watch history
 - No external Python packages required
 

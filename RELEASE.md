@@ -7,7 +7,7 @@ Set these environment variables in production:
 ```text
 HOST=0.0.0.0
 PORT=8080
-APP_NAME=Watch Party Rooms
+APP_NAME=Zynlivo
 SUPPORT_EMAIL=your-support-email
 BUSINESS_NAME=your-business-name
 STRIPE_PAYMENT_LINK=your-stripe-payment-link
@@ -21,7 +21,7 @@ SMTP_PORT=587
 SMTP_USERNAME=smtp-login
 SMTP_PASSWORD=smtp-password-or-app-password
 SMTP_FROM_EMAIL=no-reply@your-domain.com
-SMTP_FROM_NAME=Watch Party Rooms
+SMTP_FROM_NAME=Zynlivo
 SMTP_SECURITY=starttls
 ```
 
@@ -41,7 +41,7 @@ For Render release, prefer `EMAIL_PROVIDER=resend` because SMTP ports can be blo
 
 ## Native App Build
 
-Use the native app name `Watch Party Rooms` for iOS and Android.
+Use the native app name `Zynlivo` for iOS and Android.
 
 ```bash
 npm install

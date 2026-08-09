@@ -29,7 +29,7 @@ MAX_USERS = 5
 ROOM_TTL_SECONDS = 60 * 60 * 8
 YOUTUBE_SEARCH_TIMEOUT = 6
 DEFAULT_VIDEO = "M7lc1UVf-VE"
-APP_NAME = os.environ.get("APP_NAME", "Watch Party Rooms")
+APP_NAME = os.environ.get("APP_NAME", "Zynlivo")
 SUPPORT_EMAIL = os.environ.get("SUPPORT_EMAIL", "support@example.com")
 BUSINESS_NAME = os.environ.get("BUSINESS_NAME", APP_NAME)
 STRIPE_PAYMENT_LINK = os.environ.get("STRIPE_PAYMENT_LINK", "")
@@ -283,6 +283,7 @@ def public_account(account: dict) -> dict:
 
 def public_friends(account: dict) -> list[dict]:
     rows = []
+    cutoff = now_ms() - 60 * 1000
     for friend_id in account.get("friends", []):
         friend = account_by_id(str(friend_id))
         if not friend:
@@ -292,8 +293,8 @@ def public_friends(account: dict) -> list[dict]:
                 "accountId": friend.get("id", ""),
                 "nickname": friend.get("nickname") or "Friend",
                 "avatar": friend.get("avatar", "🎧"),
-                "lastRoomId": friend.get("lastRoomId", ""),
                 "lastSeenAt": friend.get("lastSeen", 0),
+                "online": int(friend.get("lastSeen", 0) or 0) >= cutoff,
             }
         )
     return rows
@@ -1280,6 +1281,13 @@ class WatchPartyHandler(BaseHTTPRequestHandler):
                 room["hostId"] = user_id
                 award_badges(user, "DJ")
             make_event(room, "system", {"message": f"{avatar} {name} joined the room."})
+            for other in room["users"].values():
+                if other.get("id") == user_id:
+                    continue
+                other_account = account_by_id(str(other.get("accountId", "")))
+                if other_account and account["id"] in other_account.get("friends", []):
+                    make_event(room, "system", {"message": f"{avatar} Your friend {name} is online."})
+                    break
             make_event(room, "room", {"snapshot": room_snapshot(room_id, room)})
             snapshot = room_snapshot(room_id, room)
             save_accounts()

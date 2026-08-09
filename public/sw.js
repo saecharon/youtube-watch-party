@@ -1,9 +1,9 @@
-self.__WATCH_PARTY_CACHE = "watch-party-pwa-v14";
+self.__WATCH_PARTY_CACHE = "zynlivo-pwa-v19";
 self.__WATCH_PARTY_ASSETS = [
   "/",
   "/index.html",
-  "/styles.css?v=otp-release-1",
-  "/app.js?v=otp-release-1",
+  "/styles.css?v=zynlivo-simple-4",
+  "/app.js?v=zynlivo-simple-4",
   "/manifest.webmanifest",
   "/icons/icon.svg",
   "/icons/icon-192.png",
@@ -69,14 +69,14 @@ self.addEventListener("message", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  let payload = { title: "Watch Party", body: "You have a new update." };
+  let payload = { title: "Zynlivo", body: "You have a new update." };
   try {
     payload = event.data ? event.data.json() : payload;
   } catch {
-    payload = { title: "Watch Party", body: event.data?.text() || "You have a new update." };
+    payload = { title: "Zynlivo", body: event.data?.text() || "You have a new update." };
   }
   event.waitUntil(
-    self.registration.showNotification(payload.title || "Watch Party", {
+    self.registration.showNotification(payload.title || "Zynlivo", {
       body: payload.body || "Open your room to continue.",
       tag: payload.tag || "watch-party",
       data: payload.url || "/",

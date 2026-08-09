@@ -1,12 +1,12 @@
 # Native App Store Review Checklist
 
-This project is configured for Capacitor builds as **Watch Party Rooms**.
+This project is configured for Capacitor builds as **Zynlivo**.
 
 No configuration can guarantee Apple App Review or Google Play approval. This checklist removes common avoidable rejection risks before submission.
 
 ## App Identity
 
-- Public app name: `Watch Party Rooms`
+- Public app name: `Zynlivo`
 - Bundle ID / package name: `com.watchparty.rooms`
 - Do not submit with `YouTube` in the app name, icon text, subtitle, or seller-facing title.
 - In descriptions, say the app lets friends watch videos together using YouTube embeds. Do not imply an official Google or YouTube partnership.
@@ -76,7 +76,7 @@ YouTube embeds and YouTube search may process data under YouTube/Google policies
 Provide a reviewer note like:
 
 ```text
-Watch Party Rooms lets up to five invited users join a private room, sync YouTube playback, chat, and play room games. The app is not affiliated with YouTube or Google. YouTube playback is provided through embedded YouTube player behavior.
+Zynlivo lets up to five invited users join a private room, sync YouTube playback, chat, and play room games. The app is not affiliated with YouTube or Google. YouTube playback is provided through embedded YouTube player behavior.
 
 Demo steps:
 1. Open the app.
